@@ -1,6 +1,10 @@
 server:
     port: 8080
 
+app:
+    frontend-origin: ${FRONTEND_ORIGIN:http://localhost:3000}
+    cookie-secure: ${COOKIE_SECURE:false}
+
 spring:
     application:
         name: backend

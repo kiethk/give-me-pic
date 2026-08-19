@@ -13,6 +13,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.UUID;
+import java.util.Arrays;
 
 @Component
 public class JwtAuthFilter extends OncePerRequestFilter {
@@ -31,18 +32,25 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
 
         String authHeader = request.getHeader("Authorization");
+        String token = null;
 
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            String token = authHeader.substring(7);
+            token = authHeader.substring(7);
+        } else if (request.getCookies() != null) {
+            token = Arrays.stream(request.getCookies())
+                    .filter(cookie -> "access_token".equals(cookie.getName()))
+                    .map(jakarta.servlet.http.Cookie::getValue)
+                    .findFirst()
+                    .orElse(null);
+        }
 
-            if (jwtService.isTokenValid(token)) {
-                UUID userId = jwtService.extractUserId(token);
+        if (token != null && jwtService.isTokenValid(token)) {
+            UUID userId = jwtService.extractUserId(token);
 
-                var authentication = new UsernamePasswordAuthenticationToken(
-                        userId, null, Collections.emptyList()
-                );
-                SecurityContextHolder.getContext().setAuthentication(authentication);
-            }
+            var authentication = new UsernamePasswordAuthenticationToken(
+                    userId, null, Collections.emptyList()
+            );
+            SecurityContextHolder.getContext().setAuthentication(authentication);
         }
 
         filterChain.doFilter(request, response);

@@ -3,6 +3,7 @@ package com.givemepic.backend.auth.service;
 import com.givemepic.backend.auth.dto.AuthResponse;
 import com.givemepic.backend.auth.dto.LoginRequest;
 import com.givemepic.backend.auth.dto.RegisterRequest;
+import com.givemepic.backend.auth.dto.UserProfileResponse;
 import com.givemepic.backend.auth.entity.RefreshToken;
 import com.givemepic.backend.auth.entity.User;
 import com.givemepic.backend.auth.repository.RefreshTokenRepository;
@@ -61,6 +62,14 @@ public class AuthService {
         }
 
         return buildAuthResponse(user);
+    }
+
+    @Transactional(readOnly = true)
+    public UserProfileResponse getProfile(UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy người dùng"));
+
+        return new UserProfileResponse(user.getId(), user.getEmail(), user.getDisplayName());
     }
 
     private AuthResponse buildAuthResponse(User user) {
