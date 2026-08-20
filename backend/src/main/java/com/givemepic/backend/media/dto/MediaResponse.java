@@ -16,6 +16,10 @@ public record MediaResponse(
         Instant createdAt
 ) {
     public static MediaResponse from(Media media) {
+        return from(media, media.getUrl());
+    }
+
+    public static MediaResponse from(Media media, String url) {
         return new MediaResponse(
                 media.getId(),
                 media.getSubjectId(),
@@ -23,7 +27,7 @@ public record MediaResponse(
                 media.getContentType(),
                 media.getSizeBytes(),
                 media.getCaption(),
-                media.getUrl(),
+                url,
                 media.getCreatedAt()
         );
     }

@@ -1,0 +1,101 @@
+package com.givemepic.backend.media.storage;
+
+import io.minio.BucketExistsArgs;
+import io.minio.GetPresignedObjectUrlArgs;
+import io.minio.MakeBucketArgs;
+import io.minio.MinioClient;
+import io.minio.PutObjectArgs;
+import io.minio.RemoveObjectArgs;
+import io.minio.http.Method;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.concurrent.TimeUnit;
+
+@Service
+public class MinioStorageService implements ObjectStorageService {
+
+    private final MinioClient minioClient;
+    private final String bucket;
+    private final int presignedUrlExpirySeconds;
+    private volatile boolean bucketReady;
+
+    public MinioStorageService(
+            @Value("${app.storage.endpoint}") String endpoint,
+            @Value("${app.storage.access-key}") String accessKey,
+            @Value("${app.storage.secret-key}") String secretKey,
+            @Value("${app.storage.bucket}") String bucket,
+            @Value("${app.storage.presigned-url-expiry-seconds:3600}") int presignedUrlExpirySeconds) {
+        this.minioClient = MinioClient.builder()
+                .endpoint(endpoint)
+                .credentials(accessKey, secretKey)
+                .build();
+        this.bucket = bucket;
+        this.presignedUrlExpirySeconds = presignedUrlExpirySeconds;
+    }
+
+    @Override
+    public void store(String objectKey, MultipartFile file) {
+        ensureBucket();
+
+        try {
+            minioClient.putObject(PutObjectArgs.builder()
+                    .bucket(bucket)
+                    .object(objectKey)
+                    .stream(file.getInputStream(), file.getSize(), -1)
+                    .contentType(file.getContentType() == null ? "application/octet-stream" : file.getContentType())
+                    .build());
+        } catch (Exception ex) {
+            throw new IllegalStateException("Không thể upload object lên MinIO", ex);
+        }
+    }
+
+    @Override
+    public void delete(String objectKey) {
+        try {
+            minioClient.removeObject(RemoveObjectArgs.builder()
+                    .bucket(bucket)
+                    .object(objectKey)
+                    .build());
+        } catch (Exception ex) {
+            throw new IllegalStateException("Không thể xóa object khỏi MinIO", ex);
+        }
+    }
+
+    @Override
+    public String createDownloadUrl(String objectKey) {
+        try {
+            return minioClient.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
+                    .method(Method.GET)
+                    .bucket(bucket)
+                    .object(objectKey)
+                    .expiry(presignedUrlExpirySeconds, TimeUnit.SECONDS)
+                    .build());
+        } catch (Exception ex) {
+            throw new IllegalStateException("Không thể tạo download URL từ MinIO", ex);
+        }
+    }
+
+    private void ensureBucket() {
+        if (bucketReady) {
+            return;
+        }
+
+        synchronized (this) {
+            if (bucketReady) {
+                return;
+            }
+
+            try {
+                boolean exists = minioClient.bucketExists(BucketExistsArgs.builder().bucket(bucket).build());
+                if (!exists) {
+                    minioClient.makeBucket(MakeBucketArgs.builder().bucket(bucket).build());
+                }
+                bucketReady = true;
+            } catch (Exception ex) {
+                throw new IllegalStateException("Không thể khởi tạo bucket MinIO", ex);
+            }
+        }
+    }
+}

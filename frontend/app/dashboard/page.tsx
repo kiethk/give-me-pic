@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
     archiveSubject,
     createSubject,
+    deleteMedia,
     getMedia,
     getProfile,
     getSubjects,
@@ -36,6 +37,9 @@ export default function Dashboard() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isUploadingMedia, setIsUploadingMedia] = useState(false);
     const [isLoadingSubjects, setIsLoadingSubjects] = useState(true);
+    const [isRemovingMedia, setIsRemovingMedia] = useState<Record<string, boolean>>({});
+
+    const selectedSubject = subjects.find((subject) => subject.id === selectedSubjectId) ?? null;
 
     async function loadSubjects() {
         try {
@@ -127,6 +131,22 @@ export default function Dashboard() {
         }
     }
 
+    async function handleDeleteMedia(mediaId: string) {
+        setError("");
+        setIsRemovingMedia((current) => ({ ...current, [mediaId]: true }));
+
+        try {
+            await deleteMedia(mediaId);
+            if (selectedSubjectId) {
+                await loadMediaForSubject(selectedSubjectId);
+            }
+        } catch (deleteError) {
+            setError(deleteError instanceof Error ? deleteError.message : "Không thể xóa file.");
+        } finally {
+            setIsRemovingMedia((current) => ({ ...current, [mediaId]: false }));
+        }
+    }
+
     function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
         const nextFile = event.target.files?.[0] ?? null;
         setFile(nextFile);
@@ -196,74 +216,117 @@ export default function Dashboard() {
                 </header>
 
                 <section className="mt-10 grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
-                    <div className="border border-[var(--line)] bg-[#fbfaf6] p-6 sm:p-8">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm uppercase tracking-[0.18em] text-[var(--ink-muted)]">Subjects</p>
-                                <h2 className="mt-2 text-3xl font-semibold tracking-tight">Your study shelf</h2>
-                            </div>
-                            <span className="rounded-full border border-[var(--line)] px-3 py-1 text-xs font-medium text-[var(--forest)]">
-                                {subjects.length} active
-                            </span>
-                        </div>
-
-                        <div className="mt-6 space-y-4">
-                            {isLoadingSubjects ? (
-                                <p className="text-sm text-[var(--ink-muted)]">Loading subjects...</p>
-                            ) : subjects.length === 0 ? (
-                                <div className="rounded-2xl border border-dashed border-[var(--line)] p-6 text-sm text-[var(--ink-muted)]">
-                                    Chưa có môn học nào. Hãy tạo môn học đầu tiên bên phải.
+                    <div className="space-y-5">
+                        <div className="border border-[var(--line)] bg-[#fbfaf6] p-6 sm:p-8">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm uppercase tracking-[0.18em] text-[var(--ink-muted)]">Subjects</p>
+                                    <h2 className="mt-2 text-3xl font-semibold tracking-tight">Your study shelf</h2>
                                 </div>
-                            ) : (
-                                subjects.map((subject) => {
-                                    const isSelected = selectedSubjectId === subject.id;
-                                    return (
-                                        <div
-                                            key={subject.id}
-                                            className={`rounded-2xl border p-4 shadow-sm transition-colors ${
-                                                isSelected
-                                                    ? "border-[var(--forest)] bg-[#eef4ee]"
-                                                    : "border-[var(--line)] bg-white"
-                                            }`}
-                                        >
-                                            <div className="flex items-start justify-between gap-4">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setSelectedSubjectId(subject.id)}
-                                                    className="flex flex-1 items-center gap-3 text-left"
-                                                >
-                                                    <span
-                                                        className="inline-block h-4 w-4 rounded-full border border-black/10"
-                                                        style={{ backgroundColor: subject.colorHex }}
-                                                    />
-                                                    <div>
-                                                        <h3 className="text-lg font-semibold">{subject.name}</h3>
-                                                        {subject.semester && (
-                                                            <p className="text-xs uppercase tracking-[0.14em] text-[var(--ink-muted)]">
-                                                                {subject.semester}
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleArchiveSubject(subject.id)}
-                                                    className="text-xs font-medium text-[var(--coral)] underline underline-offset-4"
-                                                >
-                                                    Archive
-                                                </button>
-                                            </div>
+                                <span className="rounded-full border border-[var(--line)] px-3 py-1 text-xs font-medium text-[var(--forest)]">
+                                    {subjects.length} active
+                                </span>
+                            </div>
 
-                                            {subject.description && (
-                                                <p className="mt-3 text-sm leading-6 text-[var(--ink-muted)]">
-                                                    {subject.description}
-                                                </p>
-                                            )}
-                                        </div>
-                                    );
-                                })
-                            )}
+                            <div className="mt-6 space-y-4">
+                                {isLoadingSubjects ? (
+                                    <p className="text-sm text-[var(--ink-muted)]">Loading subjects...</p>
+                                ) : subjects.length === 0 ? (
+                                    <div className="rounded-2xl border border-dashed border-[var(--line)] p-6 text-sm text-[var(--ink-muted)]">
+                                        Chưa có môn học nào. Hãy tạo môn học đầu tiên bên phải.
+                                    </div>
+                                ) : (
+                                    subjects.map((subject) => {
+                                        const isSelected = selectedSubjectId === subject.id;
+                                        return (
+                                            <div
+                                                key={subject.id}
+                                                className={`rounded-2xl border p-4 shadow-sm transition-colors ${
+                                                    isSelected
+                                                        ? "border-[var(--forest)] bg-[#eef4ee]"
+                                                        : "border-[var(--line)] bg-white"
+                                                }`}
+                                            >
+                                                <div className="flex items-start justify-between gap-4">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setSelectedSubjectId(subject.id)}
+                                                        className="flex flex-1 items-center gap-3 text-left"
+                                                    >
+                                                        <span
+                                                            className="inline-block h-4 w-4 rounded-full border border-black/10"
+                                                            style={{ backgroundColor: subject.colorHex }}
+                                                        />
+                                                        <div>
+                                                            <h3 className="text-lg font-semibold">{subject.name}</h3>
+                                                            {subject.semester && (
+                                                                <p className="text-xs uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+                                                                    {subject.semester}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleArchiveSubject(subject.id)}
+                                                        className="text-xs font-medium text-[var(--coral)] underline underline-offset-4"
+                                                    >
+                                                        Archive
+                                                    </button>
+                                                </div>
+
+                                                {subject.description && (
+                                                    <p className="mt-3 text-sm leading-6 text-[var(--ink-muted)]">
+                                                        {subject.description}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
                         </div>
+
+                        {selectedSubject && (
+                            <div className="border border-[var(--line)] bg-[#fbfaf6] p-6 sm:p-8">
+                                <div className="flex items-center justify-between gap-4">
+                                    <div className="flex items-center gap-3">
+                                        <span
+                                            className="inline-block h-4 w-4 rounded-full border border-black/10"
+                                            style={{ backgroundColor: selectedSubject.colorHex }}
+                                        />
+                                        <div>
+                                            <p className="text-sm uppercase tracking-[0.18em] text-[var(--ink-muted)]">Selected subject</p>
+                                            <h3 className="mt-1 text-2xl font-semibold">{selectedSubject.name}</h3>
+                                        </div>
+                                    </div>
+                                    <span className="rounded-full border border-[var(--line)] bg-white px-3 py-1 text-xs font-medium text-[var(--forest)]">
+                                        {mediaItems.length} files
+                                    </span>
+                                </div>
+
+                                <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                                    <div className="rounded-2xl border border-[var(--line)] bg-white p-3">
+                                        <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--ink-muted)]">Semester</p>
+                                        <p className="mt-2 text-sm font-medium">{selectedSubject.semester || "—"}</p>
+                                    </div>
+                                    <div className="rounded-2xl border border-[var(--line)] bg-white p-3">
+                                        <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--ink-muted)]">Status</p>
+                                        <p className="mt-2 text-sm font-medium">{selectedSubject.archived ? "Archived" : "Active"}</p>
+                                    </div>
+                                    <div className="rounded-2xl border border-[var(--line)] bg-white p-3">
+                                        <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--ink-muted)]">Updated</p>
+                                        <p className="mt-2 text-sm font-medium">
+                                            {new Date(selectedSubject.updatedAt).toLocaleDateString("vi-VN")}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {selectedSubject.description && (
+                                    <p className="mt-5 text-sm leading-6 text-[var(--ink-muted)]">{selectedSubject.description}</p>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     <div className="space-y-5">
@@ -394,20 +457,30 @@ export default function Dashboard() {
                                                 key={media.id}
                                                 className="flex items-center justify-between gap-3 rounded-xl border border-[var(--line)] bg-white px-3 py-2"
                                             >
-                                                <div>
-                                                    <p className="text-sm font-medium">{media.fileName}</p>
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="truncate text-sm font-medium">{media.fileName}</p>
                                                     {media.caption && (
-                                                        <p className="text-xs text-[var(--ink-muted)]">{media.caption}</p>
+                                                        <p className="truncate text-xs text-[var(--ink-muted)]">{media.caption}</p>
                                                     )}
                                                 </div>
-                                                <a
-                                                    href={media.url}
-                                                    target="_blank"
-                                                    rel="noreferrer"
-                                                    className="text-xs font-medium text-[var(--forest)] underline underline-offset-4"
-                                                >
-                                                    Open
-                                                </a>
+                                                <div className="flex items-center gap-2">
+                                                    <a
+                                                        href={media.url}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="text-xs font-medium text-[var(--forest)] underline underline-offset-4"
+                                                    >
+                                                        Open
+                                                    </a>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleDeleteMedia(media.id)}
+                                                        disabled={isRemovingMedia[media.id]}
+                                                        className="text-xs font-medium text-[var(--coral)] underline underline-offset-4 disabled:opacity-50"
+                                                    >
+                                                        {isRemovingMedia[media.id] ? "Removing..." : "Delete"}
+                                                    </button>
+                                                </div>
                                             </div>
                                         ))
                                     )}

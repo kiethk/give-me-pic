@@ -124,6 +124,12 @@ export async function uploadMedia(subjectId: string, file: File, caption?: strin
   return data as MediaItem;
 }
 
+export async function deleteMedia(mediaId: string) {
+  return request<void>(`/api/media/${mediaId}`, {
+    method: "DELETE",
+  });
+}
+
 export async function logout() {
   await fetch(`${apiUrl}/api/auth/logout`, {
     method: "POST",

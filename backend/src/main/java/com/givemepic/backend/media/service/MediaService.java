@@ -3,22 +3,16 @@ package com.givemepic.backend.media.service;
 import com.givemepic.backend.media.dto.MediaResponse;
 import com.givemepic.backend.media.entity.Media;
 import com.givemepic.backend.media.repository.MediaRepository;
+import com.givemepic.backend.media.storage.ObjectStorageService;
 import com.givemepic.backend.subject.entity.Subject;
 import com.givemepic.backend.subject.repository.SubjectRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -29,18 +23,13 @@ public class MediaService {
 
     private final MediaRepository mediaRepository;
     private final SubjectRepository subjectRepository;
-
-    @Value("${app.media-upload-dir:${user.home}/givemepic-uploads}")
-    private String uploadDir;
-
-    @Value("${app.base-url:http://localhost:8080}")
-    private String baseUrl;
+    private final ObjectStorageService objectStorageService;
 
     @Transactional(readOnly = true)
     public List<MediaResponse> list(UUID userId) {
         return mediaRepository.findByUserIdOrderByCreatedAtDesc(userId)
                 .stream()
-                .map(MediaResponse::from)
+                .map(media -> MediaResponse.from(media, objectStorageService.createDownloadUrl(media.getStoragePath())))
                 .toList();
     }
 
@@ -49,7 +38,7 @@ public class MediaService {
         validateSubjectOwnership(userId, subjectId);
         return mediaRepository.findByUserIdAndSubjectIdOrderByCreatedAtDesc(userId, subjectId)
                 .stream()
-                .map(MediaResponse::from)
+                .map(media -> MediaResponse.from(media, objectStorageService.createDownloadUrl(media.getStoragePath())))
                 .toList();
     }
 
@@ -64,15 +53,10 @@ public class MediaService {
         String originalName = Objects.requireNonNullElse(file.getOriginalFilename(), "upload");
         String sanitizedName = originalName.replace("\\", "/");
         String storedName = UUID.randomUUID() + "_" + sanitizedName.substring(sanitizedName.lastIndexOf('/') + 1);
+        String objectKey = userId + "/" + subjectId + "/" + storedName;
 
         try {
-            Path baseDir = Paths.get(uploadDir).toAbsolutePath().normalize();
-            Files.createDirectories(baseDir);
-
-            Path target = baseDir.resolve(storedName);
-            try (InputStream inputStream = file.getInputStream()) {
-                Files.copy(inputStream, target, StandardCopyOption.REPLACE_EXISTING);
-            }
+            objectStorageService.store(objectKey, file);
 
             Media media = Media.builder()
                     .userId(userId)
@@ -82,13 +66,14 @@ public class MediaService {
                     .contentType(file.getContentType())
                     .sizeBytes(file.getSize())
                     .caption(caption)
-                    .storagePath(target.toString())
-                    .url(baseUrl + "/uploads/" + storedName)
+                    .storagePath(objectKey)
+                    .url(objectKey)
                     .build();
 
-            return MediaResponse.from(mediaRepository.save(media));
-        } catch (IOException ex) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Không thể lưu file", ex);
+            Media savedMedia = mediaRepository.save(media);
+            return MediaResponse.from(savedMedia, objectStorageService.createDownloadUrl(objectKey));
+        } catch (RuntimeException ex) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Không thể lưu file vào storage", ex);
         }
     }
 
@@ -101,13 +86,7 @@ public class MediaService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không có quyền xóa file này");
         }
 
-        try {
-            Path target = Paths.get(media.getStoragePath());
-            Files.deleteIfExists(target);
-        } catch (IOException ex) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Không thể xóa file", ex);
-        }
-
+        objectStorageService.delete(media.getStoragePath());
         mediaRepository.delete(media);
     }
 

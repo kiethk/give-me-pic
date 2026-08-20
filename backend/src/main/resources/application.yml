@@ -4,8 +4,13 @@ server:
 app:
     frontend-origin: ${FRONTEND_ORIGIN:http://localhost:3000}
     cookie-secure: ${COOKIE_SECURE:false}
-    media-upload-dir: ${MEDIA_UPLOAD_DIR:${user.home}/givemepic-uploads}
     base-url: ${APP_BASE_URL:http://localhost:8080}
+    storage:
+        endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+        access-key: ${MINIO_ROOT_USER:givemepic}
+        secret-key: ${MINIO_ROOT_PASSWORD:givemepic_dev_password}
+        bucket: ${MINIO_BUCKET:givemepic-media}
+        presigned-url-expiry-seconds: ${MINIO_PRESIGNED_URL_EXPIRY_SECONDS:3600}
 
 spring:
     application:
