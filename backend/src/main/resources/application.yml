@@ -4,6 +4,8 @@ server:
 app:
     frontend-origin: ${FRONTEND_ORIGIN:http://localhost:3000}
     cookie-secure: ${COOKIE_SECURE:false}
+    media-upload-dir: ${MEDIA_UPLOAD_DIR:${user.home}/givemepic-uploads}
+    base-url: ${APP_BASE_URL:http://localhost:8080}
 
 spring:
     application:

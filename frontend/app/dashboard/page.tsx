@@ -1,25 +1,154 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { getProfile, logout, UserProfile } from "@/lib/api-client";
+import {
+    archiveSubject,
+    createSubject,
+    getMedia,
+    getProfile,
+    getSubjects,
+    logout,
+    MediaItem,
+    Subject,
+    uploadMedia,
+    UserProfile,
+} from "@/lib/api-client";
+
+const defaultForm = {
+    name: "",
+    description: "",
+    colorHex: "#1F4D3A",
+    semester: "",
+};
 
 export default function Dashboard() {
     const router = useRouter();
     const [profile, setProfile] = useState<UserProfile | null>(null);
+    const [subjects, setSubjects] = useState<Subject[]>([]);
+    const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
+    const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
+    const [caption, setCaption] = useState("");
+    const [file, setFile] = useState<File | null>(null);
+    const [form, setForm] = useState(defaultForm);
     const [error, setError] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+    const [isLoadingSubjects, setIsLoadingSubjects] = useState(true);
+
+    async function loadSubjects() {
+        try {
+            const data = await getSubjects();
+            setSubjects(data);
+            if (!selectedSubjectId && data.length > 0) {
+                setSelectedSubjectId(data[0].id);
+            }
+            if (data.length === 0) {
+                setSelectedSubjectId(null);
+                setMediaItems([]);
+            }
+        } catch (loadError) {
+            setError(loadError instanceof Error ? loadError.message : "Không tải được danh sách môn học.");
+        } finally {
+            setIsLoadingSubjects(false);
+        }
+    }
+
+    async function loadMediaForSubject(subjectId: string) {
+        try {
+            const data = await getMedia(subjectId);
+            setMediaItems(data);
+        } catch (mediaError) {
+            setError(mediaError instanceof Error ? mediaError.message : "Không tải được media của môn học.");
+        }
+    }
 
     async function handleLogout() {
         await logout();
         router.push("/");
     }
 
+    async function handleCreateSubject(event: FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+        setError("");
+        setIsSubmitting(true);
+
+        try {
+            await createSubject({
+                name: form.name,
+                description: form.description || undefined,
+                colorHex: form.colorHex,
+                semester: form.semester || undefined,
+            });
+            setForm(defaultForm);
+            await loadSubjects();
+        } catch (submitError) {
+            setError(submitError instanceof Error ? submitError.message : "Không thể tạo môn học.");
+        } finally {
+            setIsSubmitting(false);
+        }
+    }
+
+    async function handleArchiveSubject(subjectId: string) {
+        setError("");
+
+        try {
+            await archiveSubject(subjectId);
+            await loadSubjects();
+            if (selectedSubjectId === subjectId) {
+                setSelectedSubjectId(null);
+                setMediaItems([]);
+            }
+        } catch (archiveError) {
+            setError(archiveError instanceof Error ? archiveError.message : "Không thể ẩn môn học.");
+        }
+    }
+
+    async function handleUploadMedia(event: FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+        if (!selectedSubjectId || !file) {
+            setError("Vui lòng chọn môn học và file cần upload.");
+            return;
+        }
+
+        setError("");
+        setIsUploadingMedia(true);
+
+        try {
+            await uploadMedia(selectedSubjectId, file, caption || undefined);
+            setCaption("");
+            setFile(null);
+            await loadMediaForSubject(selectedSubjectId);
+        } catch (uploadError) {
+            setError(uploadError instanceof Error ? uploadError.message : "Không thể upload ảnh.");
+        } finally {
+            setIsUploadingMedia(false);
+        }
+    }
+
+    function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+        const nextFile = event.target.files?.[0] ?? null;
+        setFile(nextFile);
+    }
+
     useEffect(() => {
         getProfile()
-            .then(setProfile)
+            .then((profileData) => {
+                setProfile(profileData);
+                return loadSubjects();
+            })
             .catch(() => setError("Bạn cần đăng nhập để xem trang này."));
     }, []);
+
+    useEffect(() => {
+        if (!selectedSubjectId) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+            setMediaItems([]);
+            return;
+        }
+        loadMediaForSubject(selectedSubjectId).catch(() => undefined);
+    }, [selectedSubjectId]);
 
     if (error) {
         return (
@@ -48,8 +177,8 @@ export default function Dashboard() {
 
     return (
         <main className="min-h-screen bg-[var(--background)] px-6 py-8 sm:px-12 sm:py-12">
-            <div className="mx-auto max-w-5xl">
-                <header className="flex items-start justify-between border-b border-[var(--line)] pb-8">
+            <div className="mx-auto max-w-6xl">
+                <header className="flex items-start justify-between gap-4 border-b border-[var(--line)] pb-8">
                     <div>
                         <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[var(--coral)]">
                             Give Me Pic
@@ -65,17 +194,226 @@ export default function Dashboard() {
                         Sign out
                     </button>
                 </header>
-                <section className="mt-10 grid gap-5 sm:grid-cols-3">
-                    <div className="bg-[var(--forest)] p-6 text-[#f4f1ea] sm:col-span-2">
-                        <p className="text-sm uppercase tracking-[0.18em] text-[#d9e4d2]">Your archive</p>
-                        <p className="mt-12 max-w-md text-2xl leading-snug">
-                            Your first study shelf is ready for the moments worth keeping.
-                        </p>
+
+                <section className="mt-10 grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
+                    <div className="border border-[var(--line)] bg-[#fbfaf6] p-6 sm:p-8">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm uppercase tracking-[0.18em] text-[var(--ink-muted)]">Subjects</p>
+                                <h2 className="mt-2 text-3xl font-semibold tracking-tight">Your study shelf</h2>
+                            </div>
+                            <span className="rounded-full border border-[var(--line)] px-3 py-1 text-xs font-medium text-[var(--forest)]">
+                                {subjects.length} active
+                            </span>
+                        </div>
+
+                        <div className="mt-6 space-y-4">
+                            {isLoadingSubjects ? (
+                                <p className="text-sm text-[var(--ink-muted)]">Loading subjects...</p>
+                            ) : subjects.length === 0 ? (
+                                <div className="rounded-2xl border border-dashed border-[var(--line)] p-6 text-sm text-[var(--ink-muted)]">
+                                    Chưa có môn học nào. Hãy tạo môn học đầu tiên bên phải.
+                                </div>
+                            ) : (
+                                subjects.map((subject) => {
+                                    const isSelected = selectedSubjectId === subject.id;
+                                    return (
+                                        <div
+                                            key={subject.id}
+                                            className={`rounded-2xl border p-4 shadow-sm transition-colors ${
+                                                isSelected
+                                                    ? "border-[var(--forest)] bg-[#eef4ee]"
+                                                    : "border-[var(--line)] bg-white"
+                                            }`}
+                                        >
+                                            <div className="flex items-start justify-between gap-4">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setSelectedSubjectId(subject.id)}
+                                                    className="flex flex-1 items-center gap-3 text-left"
+                                                >
+                                                    <span
+                                                        className="inline-block h-4 w-4 rounded-full border border-black/10"
+                                                        style={{ backgroundColor: subject.colorHex }}
+                                                    />
+                                                    <div>
+                                                        <h3 className="text-lg font-semibold">{subject.name}</h3>
+                                                        {subject.semester && (
+                                                            <p className="text-xs uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+                                                                {subject.semester}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleArchiveSubject(subject.id)}
+                                                    className="text-xs font-medium text-[var(--coral)] underline underline-offset-4"
+                                                >
+                                                    Archive
+                                                </button>
+                                            </div>
+
+                                            {subject.description && (
+                                                <p className="mt-3 text-sm leading-6 text-[var(--ink-muted)]">
+                                                    {subject.description}
+                                                </p>
+                                            )}
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
                     </div>
-                    <div className="border border-[var(--line)] bg-[#fbfaf6] p-6">
-                        <p className="text-sm uppercase tracking-[0.18em] text-[var(--ink-muted)]">Account</p>
-                        <p className="mt-6 break-words text-sm">{profile.email}</p>
-                        <p className="mt-2 text-xs text-[var(--ink-muted)]">{profile.userId}</p>
+
+                    <div className="space-y-5">
+                        <form
+                            onSubmit={handleCreateSubject}
+                            className="border border-[var(--line)] bg-[#fbfaf6] p-6 sm:p-8"
+                        >
+                            <p className="text-sm uppercase tracking-[0.18em] text-[var(--ink-muted)]">New subject</p>
+                            <h2 className="mt-2 text-3xl font-semibold tracking-tight">Create a subject</h2>
+
+                            <div className="mt-6 space-y-5">
+                                <label className="block text-sm font-medium">
+                                    Subject name
+                                    <input
+                                        required
+                                        value={form.name}
+                                        onChange={(event) =>
+                                            setForm((current) => ({ ...current, name: event.target.value }))
+                                        }
+                                        className="mt-2 h-12 w-full border-b border-[var(--line)] bg-transparent px-1 outline-none transition-colors focus:border-[var(--forest)]"
+                                        placeholder="Toán học"
+                                    />
+                                </label>
+
+                                <label className="block text-sm font-medium">
+                                    Description
+                                    <textarea
+                                        value={form.description}
+                                        onChange={(event) =>
+                                            setForm((current) => ({ ...current, description: event.target.value }))
+                                        }
+                                        className="mt-2 min-h-24 w-full border border-[var(--line)] bg-transparent p-3 outline-none transition-colors focus:border-[var(--forest)]"
+                                        placeholder="Ghi chú, mục tiêu học tập, ..."
+                                    />
+                                </label>
+
+                                <div className="grid gap-5 sm:grid-cols-2">
+                                    <label className="block text-sm font-medium">
+                                        Semester
+                                        <input
+                                            value={form.semester}
+                                            onChange={(event) =>
+                                                setForm((current) => ({ ...current, semester: event.target.value }))
+                                            }
+                                            className="mt-2 h-12 w-full border-b border-[var(--line)] bg-transparent px-1 outline-none transition-colors focus:border-[var(--forest)]"
+                                            placeholder="2026-1"
+                                        />
+                                    </label>
+
+                                    <label className="block text-sm font-medium">
+                                        Color
+                                        <div className="mt-2 flex h-12 items-center gap-3 border border-[var(--line)] bg-white px-3">
+                                            <input
+                                                type="color"
+                                                value={form.colorHex}
+                                                onChange={(event) =>
+                                                    setForm((current) => ({ ...current, colorHex: event.target.value }))
+                                                }
+                                                className="h-8 w-10 border-0 bg-transparent p-0"
+                                            />
+                                            <span className="text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)]">
+                                                {form.colorHex}
+                                            </span>
+                                        </div>
+                                    </label>
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    disabled={isSubmitting}
+                                    className="mt-3 flex h-12 w-full items-center justify-center bg-[var(--coral)] px-5 font-semibold text-white transition-transform hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-60"
+                                >
+                                    {isSubmitting ? "Creating..." : "Create subject"}
+                                </button>
+                            </div>
+                        </form>
+
+                        <div className="border border-[var(--line)] bg-[#fbfaf6] p-6 sm:p-8">
+                            <p className="text-sm uppercase tracking-[0.18em] text-[var(--ink-muted)]">Media</p>
+                            <h2 className="mt-2 text-3xl font-semibold tracking-tight">Upload to subject</h2>
+
+                            {selectedSubjectId ? (
+                                <form onSubmit={handleUploadMedia} className="mt-6 space-y-5">
+                                    <div className="rounded-2xl border border-dashed border-[var(--line)] bg-white p-4">
+                                        <label className="flex cursor-pointer flex-col items-center justify-center gap-2 text-center text-sm text-[var(--ink-muted)]">
+                                            <span className="rounded-full bg-[var(--forest)] px-3 py-1 text-xs font-medium uppercase tracking-[0.12em] text-white">
+                                                Select file
+                                            </span>
+                                            <input type="file" className="hidden" onChange={handleFileChange} />
+                                            <span>{file ? file.name : "Chưa chọn file"}</span>
+                                        </label>
+                                    </div>
+
+                                    <label className="block text-sm font-medium">
+                                        Caption
+                                        <input
+                                            value={caption}
+                                            onChange={(event) => setCaption(event.target.value)}
+                                            className="mt-2 h-12 w-full border-b border-[var(--line)] bg-transparent px-1 outline-none transition-colors focus:border-[var(--forest)]"
+                                            placeholder="Bài tập toán, ảnh vẽ,..."
+                                        />
+                                    </label>
+
+                                    <button
+                                        type="submit"
+                                        disabled={isUploadingMedia || !file}
+                                        className="flex h-12 w-full items-center justify-center bg-[var(--forest)] px-5 font-semibold text-white transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                        {isUploadingMedia ? "Uploading..." : "Upload"}
+                                    </button>
+                                </form>
+                            ) : (
+                                <p className="mt-6 text-sm text-[var(--ink-muted)]">
+                                    Chọn một môn học để upload ảnh hoặc file.
+                                </p>
+                            )}
+
+                            <div className="mt-6 border-t border-[var(--line)] pt-5">
+                                <p className="text-xs uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+                                    Uploaded files
+                                </p>
+                                <div className="mt-3 space-y-2">
+                                    {mediaItems.length === 0 ? (
+                                        <p className="text-sm text-[var(--ink-muted)]">Chưa có file nào trong môn học này.</p>
+                                    ) : (
+                                        mediaItems.map((media) => (
+                                            <div
+                                                key={media.id}
+                                                className="flex items-center justify-between gap-3 rounded-xl border border-[var(--line)] bg-white px-3 py-2"
+                                            >
+                                                <div>
+                                                    <p className="text-sm font-medium">{media.fileName}</p>
+                                                    {media.caption && (
+                                                        <p className="text-xs text-[var(--ink-muted)]">{media.caption}</p>
+                                                    )}
+                                                </div>
+                                                <a
+                                                    href={media.url}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="text-xs font-medium text-[var(--forest)] underline underline-offset-4"
+                                                >
+                                                    Open
+                                                </a>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </section>
             </div>
