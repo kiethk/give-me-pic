@@ -46,6 +46,8 @@ export type MediaItem = {
   sizeBytes: number;
   caption: string | null;
   url: string;
+  ocrStatus: string;
+  ocrError: string | null;
   createdAt: string;
 };
 
@@ -95,8 +97,9 @@ export async function archiveSubject(subjectId: string) {
   });
 }
 
-export async function getMedia(subjectId: string) {
-  return request<MediaItem[]>(`/api/media?subjectId=${encodeURIComponent(subjectId)}`, {
+export async function getMedia(subjectId?: string) {
+  const query = subjectId ? `?subjectId=${encodeURIComponent(subjectId)}` : "";
+  return request<MediaItem[]>(`/api/media${query}`, {
     method: "GET",
   });
 }

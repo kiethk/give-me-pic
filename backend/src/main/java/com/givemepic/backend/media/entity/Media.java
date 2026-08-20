@@ -55,6 +55,13 @@ public class Media {
     @Column(name = "url", nullable = false, length = 500)
     private String url;
 
+    @Column(name = "ocr_status", nullable = false, length = 20)
+    @Builder.Default
+    private String ocrStatus = "pending";
+
+    @Column(name = "ocr_error")
+    private String ocrError;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

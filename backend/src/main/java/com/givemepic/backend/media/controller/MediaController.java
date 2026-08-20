@@ -53,4 +53,12 @@ public class MediaController {
         mediaService.delete(userId, id);
         return ResponseEntity.noContent().build();
     }
+
+    @PostMapping("/{id}/ocr/retry")
+    public ResponseEntity<Void> retryOcr(
+            @AuthenticationPrincipal UUID userId,
+            @PathVariable UUID id) {
+        mediaService.retryOcr(userId, id);
+        return ResponseEntity.accepted().build();
+    }
 }

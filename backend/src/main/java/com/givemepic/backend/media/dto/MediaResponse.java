@@ -13,6 +13,8 @@ public record MediaResponse(
         long sizeBytes,
         String caption,
         String url,
+        String ocrStatus,
+        String ocrError,
         Instant createdAt
 ) {
     public static MediaResponse from(Media media) {
@@ -28,6 +30,8 @@ public record MediaResponse(
                 media.getSizeBytes(),
                 media.getCaption(),
                 url,
+                media.getOcrStatus(),
+                media.getOcrError(),
                 media.getCreatedAt()
         );
     }

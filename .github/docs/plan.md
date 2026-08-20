@@ -6,8 +6,8 @@
 
 ## Current Status
 
-Phase: 1 — Auth + Media MVP
-Last updated: 2026-08-19
+Phase: 2 — RAG Pipeline
+Last updated: 2026-08-20
 
 ## Completed
 
@@ -16,19 +16,41 @@ Last updated: 2026-08-19
 - [x] Auth module (backend): `User` entity, `POST /api/auth/register`, `POST /api/auth/login`
 - [x] JWT auth working end-to-end via httpOnly cookie + CORS
 - [x] Next.js frontend scaffolded (App Router, TypeScript, Tailwind), production build passes
+- [x] Phase 1 complete: auth, subjects, image upload, MinIO storage, grouped photo grid, and manual E2E validation
+- [x] Media module (backend): `Media` entity, upload/list/filter endpoints, delete flow, and MinIO presigned URLs
+- [x] Subject module (backend + frontend): create, list, update, and archive flow
+- [x] Frontend capture/upload flow with `accept="image/*"` and `capture="environment"`
+- [x] Backend and frontend validation passes; manual E2E confirms refresh persistence through MinIO
+- [x] Phase 2 persistence foundation: OCR status on `media_files`, `ocr_results`, `document_chunks`, and `chunk_embeddings`
+- [x] Phase 2 async OCR worker: post-commit event dispatch, bounded executor, Tesseract adapter, status transitions, failure persistence, and retry endpoint
 
 ## In Progress
 
-- [ ] Backend tests for auth module
+- [ ] Phase 2 — RAG Pipeline
+- [ ] Chunking service and OCR-to-chunk processing contract
 
 ## Not Started
 
-- [ ] Frontend: register/login pages calling the auth API
-- [ ] Media module (backend): `Photo` entity, upload endpoint to MinIO/S3, list endpoint
-- [ ] Frontend: capture/upload page, photo grid grouped by subject
-- [ ] Subject module (backend + frontend)
-- [ ] RAG pipeline: OCR, chunking, embedding, chat + citations
+- [x] OCR service and asynchronous processing jobs
+- [ ] Chunking and embedding services
+- [x] OCR retry/failure handling API
+- [ ] Chat backend with similarity search and citations
+- [ ] NotebookLM-style chat UI with citation navigation
 - [ ] Billing/subscription tracking (`subscriptions`, `usage_monthly`)
+
+## Phase 2 — RAG Pipeline (the core differentiator)
+
+Goal: uploaded media becomes searchable via natural-language questions, and every answer cites the source media used.
+
+- [ ] OCR service: run OCR on every uploaded media item asynchronously, write to `ocr_results`
+- [ ] Chunking service: split `ocr_results.raw_text` into `document_chunks`
+- [ ] Embedding service: call the embedding API for each chunk, store in `chunk_embeddings`
+- [ ] Retry/failure handling: `ocr_status` transitions (`pending` → `processing` → `completed`/`failed`), with a way to inspect and retry failed media
+- [ ] Chat backend: `POST /api/chat` — embed the question, run similarity search, build the prompt, call the LLM, store `chat_messages` and `message_citations`
+- [ ] Frontend chat UI: ask questions, show answers, and navigate to cited source media
+- [ ] Frontend per-subject chat scope, with all-media scope as the default alternative
+
+**Exit criteria:** upload several media items across different subjects, ask a question answerable from only one item, and receive a correct answer with the correct source media cited.
 
 ## Locked-in Decisions
 
@@ -95,28 +117,24 @@ CREATE INDEX idx_subjects_user_id ON subjects(user_id);
 ### Module: Media
 
 ```sql
-CREATE TABLE photos (
+CREATE TABLE media_files (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     subject_id UUID REFERENCES subjects(id) ON DELETE SET NULL,
-    object_key VARCHAR(500) NOT NULL,
-    thumbnail_key VARCHAR(500),
-    original_filename VARCHAR(255),
-    mime_type VARCHAR(50) NOT NULL,
-    file_size_bytes BIGINT NOT NULL,
-    width_px INTEGER,
-    height_px INTEGER,
-    captured_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    upload_status VARCHAR(20) NOT NULL DEFAULT 'completed',
+    file_name VARCHAR(255) NOT NULL,
+    stored_name VARCHAR(255) NOT NULL,
+    content_type VARCHAR(100),
+    size_bytes BIGINT NOT NULL,
+    caption VARCHAR(500),
+    storage_path VARCHAR(500) NOT NULL,
+    url VARCHAR(500) NOT NULL,
     ocr_status VARCHAR(20) NOT NULL DEFAULT 'pending',
-    deleted_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    ocr_error TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_photos_user_id ON photos(user_id);
-CREATE INDEX idx_photos_subject_id ON photos(subject_id);
-CREATE INDEX idx_photos_ocr_status ON photos(ocr_status) WHERE ocr_status IN ('pending', 'processing');
+CREATE INDEX idx_media_files_user_id ON media_files(user_id);
+CREATE INDEX idx_media_files_subject_id ON media_files(subject_id);
 ```
 
 ### Module: OCR & RAG
@@ -124,7 +142,7 @@ CREATE INDEX idx_photos_ocr_status ON photos(ocr_status) WHERE ocr_status IN ('p
 ```sql
 CREATE TABLE ocr_results (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    photo_id UUID NOT NULL UNIQUE REFERENCES photos(id) ON DELETE CASCADE,
+    media_id UUID NOT NULL UNIQUE REFERENCES media_files(id) ON DELETE CASCADE,
     raw_text TEXT,
     confidence_score REAL,
     ocr_engine VARCHAR(30) NOT NULL,
@@ -135,7 +153,7 @@ CREATE TABLE ocr_results (
 
 CREATE TABLE document_chunks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    photo_id UUID NOT NULL REFERENCES photos(id) ON DELETE CASCADE,
+    media_id UUID NOT NULL REFERENCES media_files(id) ON DELETE CASCADE,
     ocr_result_id UUID NOT NULL REFERENCES ocr_results(id) ON DELETE CASCADE,
     chunk_index INTEGER NOT NULL,
     content TEXT NOT NULL,
@@ -143,7 +161,7 @@ CREATE TABLE document_chunks (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_chunks_photo_id ON document_chunks(photo_id);
+CREATE INDEX idx_chunks_media_id ON document_chunks(media_id);
 
 CREATE EXTENSION IF NOT EXISTS vector;
 
@@ -181,7 +199,7 @@ CREATE TABLE message_citations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     message_id UUID NOT NULL REFERENCES chat_messages(id) ON DELETE CASCADE,
     chunk_id UUID NOT NULL REFERENCES document_chunks(id) ON DELETE CASCADE,
-    photo_id UUID NOT NULL REFERENCES photos(id) ON DELETE CASCADE,
+    media_id UUID NOT NULL REFERENCES media_files(id) ON DELETE CASCADE,
     similarity_score REAL
 );
 
@@ -207,7 +225,7 @@ CREATE TABLE usage_monthly (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     year_month VARCHAR(7) NOT NULL,
-    photos_uploaded_count INTEGER NOT NULL DEFAULT 0,
+    media_uploaded_count INTEGER NOT NULL DEFAULT 0,
     questions_asked_count INTEGER NOT NULL DEFAULT 0,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE(user_id, year_month)
@@ -216,10 +234,10 @@ CREATE TABLE usage_monthly (
 
 ## Data Flow Summary
 
-A `user` owns many `subjects`. Each `subject` contains many `photos`. Each
-`photo` produces exactly one `ocr_result`, which is split into many
+A `user` owns many `subjects`. Each `subject` contains many `media_files`. Each
+`media_file` produces exactly one `ocr_result`, which is split into many
 `document_chunks`, each with exactly one `chunk_embedding`. When a user asks
 a question in a `chat_session`, the assistant's `chat_message` links to
 `message_citations`, each pointing to a `document_chunk` and, through it,
-the source `photo`. `subscriptions` and `usage_monthly` track the business
+the source `media_file`. `subscriptions` and `usage_monthly` track the business
 model independently and don't block the core product flow.

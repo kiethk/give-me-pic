@@ -2,6 +2,7 @@ package com.givemepic.backend.media.storage;
 
 import io.minio.BucketExistsArgs;
 import io.minio.GetPresignedObjectUrlArgs;
+import io.minio.GetObjectArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
@@ -60,6 +61,18 @@ public class MinioStorageService implements ObjectStorageService {
                     .build());
         } catch (Exception ex) {
             throw new IllegalStateException("Không thể xóa object khỏi MinIO", ex);
+        }
+    }
+
+    @Override
+    public byte[] download(String objectKey) {
+        try (var inputStream = minioClient.getObject(GetObjectArgs.builder()
+                .bucket(bucket)
+                .object(objectKey)
+                .build())) {
+            return inputStream.readAllBytes();
+        } catch (Exception ex) {
+            throw new IllegalStateException("Không thể tải object từ MinIO", ex);
         }
     }
 

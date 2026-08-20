@@ -8,5 +8,7 @@ public interface ObjectStorageService {
 
     void delete(String objectKey);
 
+    byte[] download(String objectKey);
+
     String createDownloadUrl(String objectKey);
 }

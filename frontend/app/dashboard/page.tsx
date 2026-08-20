@@ -29,6 +29,7 @@ export default function Dashboard() {
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [subjects, setSubjects] = useState<Subject[]>([]);
     const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
+    const [allMediaItems, setAllMediaItems] = useState<MediaItem[]>([]);
     const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
     const [caption, setCaption] = useState("");
     const [file, setFile] = useState<File | null>(null);
@@ -65,6 +66,14 @@ export default function Dashboard() {
             setMediaItems(data);
         } catch (mediaError) {
             setError(mediaError instanceof Error ? mediaError.message : "Không tải được media của môn học.");
+        }
+    }
+
+    async function loadAllMedia() {
+        try {
+            setAllMediaItems(await getMedia());
+        } catch (mediaError) {
+            setError(mediaError instanceof Error ? mediaError.message : "Không tải được thư viện ảnh.");
         }
     }
 
@@ -123,7 +132,7 @@ export default function Dashboard() {
             await uploadMedia(selectedSubjectId, file, caption || undefined);
             setCaption("");
             setFile(null);
-            await loadMediaForSubject(selectedSubjectId);
+            await Promise.all([loadMediaForSubject(selectedSubjectId), loadAllMedia()]);
         } catch (uploadError) {
             setError(uploadError instanceof Error ? uploadError.message : "Không thể upload ảnh.");
         } finally {
@@ -137,9 +146,10 @@ export default function Dashboard() {
 
         try {
             await deleteMedia(mediaId);
-            if (selectedSubjectId) {
-                await loadMediaForSubject(selectedSubjectId);
-            }
+            await Promise.all([
+                selectedSubjectId ? loadMediaForSubject(selectedSubjectId) : Promise.resolve(),
+                loadAllMedia(),
+            ]);
         } catch (deleteError) {
             setError(deleteError instanceof Error ? deleteError.message : "Không thể xóa file.");
         } finally {
@@ -156,7 +166,7 @@ export default function Dashboard() {
         getProfile()
             .then((profileData) => {
                 setProfile(profileData);
-                return loadSubjects();
+                return Promise.all([loadSubjects(), loadAllMedia()]);
             })
             .catch(() => setError("Bạn cần đăng nhập để xem trang này."));
     }, []);
@@ -415,7 +425,13 @@ export default function Dashboard() {
                                             <span className="rounded-full bg-[var(--forest)] px-3 py-1 text-xs font-medium uppercase tracking-[0.12em] text-white">
                                                 Select file
                                             </span>
-                                            <input type="file" className="hidden" onChange={handleFileChange} />
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                capture="environment"
+                                                className="hidden"
+                                                onChange={handleFileChange}
+                                            />
                                             <span>{file ? file.name : "Chưa chọn file"}</span>
                                         </label>
                                     </div>
@@ -488,6 +504,71 @@ export default function Dashboard() {
                             </div>
                         </div>
                     </div>
+                </section>
+
+                <section className="mt-5 border border-[var(--line)] bg-[#fbfaf6] p-6 sm:p-8">
+                    <div className="flex items-end justify-between gap-4">
+                        <div>
+                            <p className="text-sm uppercase tracking-[0.18em] text-[var(--ink-muted)]">Library</p>
+                            <h2 className="mt-2 text-3xl font-semibold tracking-tight">Your photo grid</h2>
+                        </div>
+                        <span className="text-xs uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+                            {allMediaItems.length} photos
+                        </span>
+                    </div>
+
+                    {allMediaItems.length === 0 ? (
+                        <div className="mt-6 rounded-2xl border border-dashed border-[var(--line)] p-8 text-center text-sm text-[var(--ink-muted)]">
+                            Chưa có ảnh nào. Hãy chọn một môn học và upload ảnh đầu tiên.
+                        </div>
+                    ) : (
+                        <div className="mt-6 space-y-8">
+                            {subjects.map((subject) => {
+                                const subjectMedia = allMediaItems.filter((media) => media.subjectId === subject.id);
+                                if (subjectMedia.length === 0) {
+                                    return null;
+                                }
+
+                                return (
+                                    <div key={subject.id}>
+                                        <div className="flex items-center gap-3">
+                                            <span
+                                                className="inline-block h-3 w-3 rounded-full border border-black/10"
+                                                style={{ backgroundColor: subject.colorHex }}
+                                            />
+                                            <h3 className="text-lg font-semibold">{subject.name}</h3>
+                                            <span className="text-xs text-[var(--ink-muted)]">{subjectMedia.length}</span>
+                                        </div>
+                                        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                                            {subjectMedia.map((media) => (
+                                                <a
+                                                    key={media.id}
+                                                    href={media.url}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="group overflow-hidden border border-[var(--line)] bg-white"
+                                                >
+                                                    <div className="aspect-square overflow-hidden bg-[#eef4ee]">
+                                                        <img
+                                                            src={media.url}
+                                                            alt={media.caption || media.fileName}
+                                                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                                        />
+                                                    </div>
+                                                    <div className="p-3">
+                                                        <p className="truncate text-sm font-medium">{media.fileName}</p>
+                                                        {media.caption && (
+                                                            <p className="mt-1 truncate text-xs text-[var(--ink-muted)]">{media.caption}</p>
+                                                        )}
+                                                    </div>
+                                                </a>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
                 </section>
             </div>
         </main>
