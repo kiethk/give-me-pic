@@ -10,6 +10,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -35,6 +36,9 @@ class OcrProcessingServiceTests {
     @Mock
     private OcrEngine ocrEngine;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     @InjectMocks
     private OcrTransactionService ocrTransactionService;
 
@@ -47,6 +51,11 @@ class OcrProcessingServiceTests {
         when(ocrEngine.extractText(any(), eq("image/jpeg"), eq("notes.jpg"))).thenReturn("Newton's laws");
         when(ocrEngine.name()).thenReturn("test-engine");
         when(ocrResultRepository.findByMediaId(mediaId)).thenReturn(Optional.empty());
+        when(ocrResultRepository.save(any(OcrResult.class))).thenAnswer(invocation -> {
+            OcrResult result = invocation.getArgument(0);
+            result.setId(UUID.randomUUID());
+            return result;
+        });
 
         ocrTransactionService.process(mediaId);
 

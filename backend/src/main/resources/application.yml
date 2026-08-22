@@ -15,10 +15,16 @@ app:
         max-file-size-bytes: ${MEDIA_MAX_FILE_SIZE_BYTES:10485760}
     ocr:
         tesseract-command: ${TESSERACT_COMMAND:tesseract}
-        languages: ${TESSERACT_LANGUAGES:eng}
+        languages: ${TESSERACT_LANGUAGES:vie+eng}
         timeout-seconds: ${OCR_TIMEOUT_SECONDS:60}
+    embedding:
+        gemini-api-key: ${GEMINI_API_KEY:}
+        model: ${GEMINI_EMBEDDING_MODEL:gemini-embedding-001}
+        output-dimensionality: ${GEMINI_EMBEDDING_DIMENSION:768}
 
 spring:
+    config:
+        import: optional:file:.env[.properties],optional:file:../.env[.properties]
     application:
         name: backend
     datasource:
