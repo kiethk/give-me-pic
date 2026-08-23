@@ -42,6 +42,13 @@ public class DocumentChunk {
     @Column(name = "token_count")
     private Integer tokenCount;
 
+    @Column(name = "embedding_status", nullable = false)
+    @Builder.Default
+    private String embeddingStatus = "pending";
+
+    @Column(name = "embedding_error", columnDefinition = "TEXT")
+    private String embeddingError;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
