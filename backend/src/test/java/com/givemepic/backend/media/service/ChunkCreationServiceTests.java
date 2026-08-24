@@ -8,6 +8,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.List;
 import java.util.Optional;
@@ -18,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class ChunkingServiceTests {
+class ChunkCreationServiceTests {
 
     @Mock
     private OcrResultRepository ocrResultRepository;
@@ -26,21 +27,24 @@ class ChunkingServiceTests {
     @Mock
     private DocumentChunkRepository documentChunkRepository;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     @InjectMocks
-    private ChunkingService chunkingService;
+    private ChunkCreationService chunkCreationService;
 
     @Test
-    void splitKeepsParagraphsTogetherUntilCharacterLimit() {
-        List<String> chunks = chunkingService.split("First paragraph.\n\nSecond paragraph.", 30);
+    void splitKeepsLinesTogetherUntilCharacterLimit() {
+        List<String> chunks = chunkCreationService.split("First line.\nSecond line.", 30);
 
         assertEquals(2, chunks.size());
-        assertEquals("First paragraph.", chunks.get(0));
-        assertEquals("Second paragraph.", chunks.get(1));
+        assertEquals("First line.", chunks.get(0));
+        assertEquals("Second line.", chunks.get(1));
     }
 
     @Test
     void splitBreaksLongTextIntoBoundedChunks() {
-        List<String> chunks = chunkingService.split("abcdefghijabcdefghijabcdefghij", 10);
+        List<String> chunks = chunkCreationService.split("abcdefghijabcdefghijabcdefghij", 10);
 
         assertEquals(3, chunks.size());
         assertTrue(chunks.stream().allMatch(chunk -> chunk.length() <= 10));
@@ -56,7 +60,7 @@ class ChunkingServiceTests {
                 .ocrEngine("test")
                 .build()));
 
-        chunkingService.createChunks(UUID.randomUUID(), resultId);
+        chunkCreationService.createChunks(UUID.randomUUID(), resultId);
 
         org.mockito.Mockito.verify(documentChunkRepository, org.mockito.Mockito.never())
                 .saveAll(org.mockito.ArgumentMatchers.anyList());

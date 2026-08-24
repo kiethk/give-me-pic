@@ -1,161 +1,214 @@
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
 type AuthPayload = {
-  email: string;
-  password: string;
-  displayName?: string;
+    email: string;
+    password: string;
+    displayName?: string;
 };
 
 export type AuthResponse = {
-  accessToken: string;
-  refreshToken: string;
-  userId: string;
-  email: string;
-  displayName: string;
+    accessToken: string;
+    refreshToken: string;
+    userId: string;
+    email: string;
+    displayName: string;
 };
 
 export type UserProfile = {
-  userId: string;
-  email: string;
-  displayName: string;
+    userId: string;
+    email: string;
+    displayName: string;
 };
 
 export type Subject = {
-  id: string;
-  name: string;
-  description: string | null;
-  colorHex: string;
-  semester: string | null;
-  archived: boolean;
-  createdAt: string;
-  updatedAt: string;
+    id: string;
+    name: string;
+    description: string | null;
+    colorHex: string;
+    semester: string | null;
+    archived: boolean;
+    createdAt: string;
+    updatedAt: string;
 };
 
 export type CreateSubjectInput = {
-  name: string;
-  description?: string;
-  colorHex?: string;
-  semester?: string;
+    name: string;
+    description?: string;
+    colorHex?: string;
+    semester?: string;
 };
 
 export type MediaItem = {
-  id: string;
-  subjectId: string;
-  fileName: string;
-  contentType: string | null;
-  sizeBytes: number;
-  caption: string | null;
-  url: string;
-  ocrStatus: string;
-  ocrError: string | null;
-  createdAt: string;
+    id: string;
+    subjectId: string;
+    fileName: string;
+    contentType: string | null;
+    sizeBytes: number;
+    caption: string | null;
+    url: string;
+    ocrStatus: string;
+    ocrError: string | null;
+    createdAt: string;
 };
 
+export type ChatCitation = {
+    chunkId: string;
+    mediaId: string;
+    fileName: string;
+    imageUrl: string;
+    similarityScore: number;
+};
+
+export type ChatSession = {
+    sessionId: string;
+    subjectId: string | null;
+    title: string | null;
+    createdAt: string;
+    updatedAt: string;
+};
+
+export type ChatHistoryMessage = {
+    messageId: string;
+    role: "user" | "assistant";
+    content: string;
+    createdAt: string;
+    citations: ChatCitation[];
+};
+
+export type ChatAnswer = {
+    sessionId: string;
+    messageId: string;
+    answer: string;
+    citations: ChatCitation[];
+};
+
+export async function askChat(payload: { question: string; sessionId?: string | null; subjectId?: string | null }) {
+    return request<ChatAnswer>("/api/chat", {
+        method: "POST",
+        body: payload,
+    });
+}
+
+export async function getChatSessions() {
+    return request<ChatSession[]>("/api/chat/sessions", {
+        method: "GET",
+    });
+}
+
+export async function getChatSessionMessages(sessionId: string) {
+    return request<ChatHistoryMessage[]>(`/api/chat/sessions/${sessionId}/messages`, {
+        method: "GET",
+    });
+}
+
 export async function register(payload: Required<AuthPayload>) {
-  return request<AuthResponse>("/api/auth/register", {
-    method: "POST",
-    body: payload,
-  });
+    return request<AuthResponse>("/api/auth/register", {
+        method: "POST",
+        body: payload,
+    });
 }
 
 export async function login(payload: Omit<AuthPayload, "displayName">) {
-  return request<AuthResponse>("/api/auth/login", {
-    method: "POST",
-    body: payload,
-  });
+    return request<AuthResponse>("/api/auth/login", {
+        method: "POST",
+        body: payload,
+    });
 }
 
 export async function getProfile() {
-  const response = await fetch(`${apiUrl}/api/auth/me`, {
-    credentials: "include",
-  });
-  const data = await response.json().catch(() => null);
+    const response = await fetch(`${apiUrl}/api/auth/me`, {
+        credentials: "include",
+    });
+    const data = await response.json().catch(() => null);
 
-  if (!response.ok) {
-    throw new Error(data?.message ?? "Phiên đăng nhập không hợp lệ.");
-  }
+    if (!response.ok) {
+        throw new Error(data?.message ?? "Phiên đăng nhập không hợp lệ.");
+    }
 
-  return data as UserProfile;
+    return data as UserProfile;
 }
 
 export async function getSubjects() {
-  return request<Subject[]>("/api/subjects", {
-    method: "GET",
-  });
+    return request<Subject[]>("/api/subjects", {
+        method: "GET",
+    });
 }
 
 export async function createSubject(payload: CreateSubjectInput) {
-  return request<Subject>("/api/subjects", {
-    method: "POST",
-    body: payload,
-  });
+    return request<Subject>("/api/subjects", {
+        method: "POST",
+        body: payload,
+    });
 }
 
 export async function archiveSubject(subjectId: string) {
-  return request<void>(`/api/subjects/${subjectId}`, {
-    method: "DELETE",
-  });
+    return request<void>(`/api/subjects/${subjectId}`, {
+        method: "DELETE",
+    });
 }
 
 export async function getMedia(subjectId?: string) {
-  const query = subjectId ? `?subjectId=${encodeURIComponent(subjectId)}` : "";
-  return request<MediaItem[]>(`/api/media${query}`, {
-    method: "GET",
-  });
+    const query = subjectId ? `?subjectId=${encodeURIComponent(subjectId)}` : "";
+    return request<MediaItem[]>(`/api/media${query}`, {
+        method: "GET",
+    });
 }
 
 export async function uploadMedia(subjectId: string, file: File, caption?: string) {
-  const formData = new FormData();
-  formData.append("subjectId", subjectId);
-  formData.append("file", file);
-  if (caption) {
-    formData.append("caption", caption);
-  }
+    const formData = new FormData();
+    formData.append("subjectId", subjectId);
+    formData.append("file", file);
+    if (caption) {
+        formData.append("caption", caption);
+    }
 
-  const response = await fetch(`${apiUrl}/api/media/upload`, {
-    method: "POST",
-    credentials: "include",
-    body: formData,
-  });
+    const response = await fetch(`${apiUrl}/api/media/upload`, {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+    });
 
-  const data = await response.json().catch(() => null);
+    const data = await response.json().catch(() => null);
 
-  if (!response.ok) {
-    throw new Error(data?.message ?? "Không thể upload file.");
-  }
+    if (!response.ok) {
+        throw new Error(data?.message ?? "Không thể upload file.");
+    }
 
-  return data as MediaItem;
+    return data as MediaItem;
 }
 
 export async function deleteMedia(mediaId: string) {
-  return request<void>(`/api/media/${mediaId}`, {
-    method: "DELETE",
-  });
+    return request<void>(`/api/media/${mediaId}`, {
+        method: "DELETE",
+    });
 }
 
 export async function logout() {
-  await fetch(`${apiUrl}/api/auth/logout`, {
-    method: "POST",
-    credentials: "include",
-  });
+    await fetch(`${apiUrl}/api/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+    });
 }
 
-async function request<T>(path: string, options: {
-  method: "GET" | "POST" | "PUT" | "DELETE";
-  body?: Record<string, unknown>;
-}): Promise<T> {
-  const response = await fetch(`${apiUrl}${path}`, {
-    method: options.method,
-    headers: options.body ? { "Content-Type": "application/json" } : undefined,
-    credentials: "include",
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  });
+async function request<T>(
+    path: string,
+    options: {
+        method: "GET" | "POST" | "PUT" | "DELETE";
+        body?: Record<string, unknown>;
+    },
+): Promise<T> {
+    const response = await fetch(`${apiUrl}${path}`, {
+        method: options.method,
+        headers: options.body ? { "Content-Type": "application/json" } : undefined,
+        credentials: "include",
+        body: options.body ? JSON.stringify(options.body) : undefined,
+    });
 
-  const data = await response.json().catch(() => null);
+    const data = await response.json().catch(() => null);
 
-  if (!response.ok) {
-    throw new Error(data?.message ?? "Không thể kết nối với máy chủ.");
-  }
+    if (!response.ok) {
+        throw new Error(data?.message ?? "Không thể kết nối với máy chủ.");
+    }
 
-  return data as T;
+    return data as T;
 }

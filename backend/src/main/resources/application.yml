@@ -21,7 +21,9 @@ app:
         gemini-api-key: ${GEMINI_API_KEY:}
         model: ${GEMINI_EMBEDDING_MODEL:gemini-embedding-001}
         output-dimensionality: ${GEMINI_EMBEDDING_DIMENSION:768}
-
+    chat:
+        gemini-api-key: ${GEMINI_API_KEY:}
+        model: ${GEMINI_CHAT_MODEL:gemini-3.1-flash-lite}
 spring:
     profiles:
         active: ${SPRING_PROFILES_ACTIVE:dev}

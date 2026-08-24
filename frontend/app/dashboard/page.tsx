@@ -217,12 +217,20 @@ export default function Dashboard() {
                             Good to have you, {profile.displayName}.
                         </h1>
                     </div>
-                    <button
-                        onClick={handleLogout}
-                        className="text-sm font-medium text-[var(--forest)] underline underline-offset-4"
-                    >
-                        Sign out
-                    </button>
+                    <div className="flex items-center gap-5">
+                        <Link
+                            href="/dashboard/chat"
+                            className="text-sm font-medium text-[var(--forest)] underline underline-offset-4"
+                        >
+                            Ask questions
+                        </Link>
+                        <button
+                            onClick={handleLogout}
+                            className="text-sm font-medium text-[var(--forest)] underline underline-offset-4"
+                        >
+                            Sign out
+                        </button>
+                    </div>
                 </header>
 
                 <section className="mt-10 grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
@@ -230,7 +238,9 @@ export default function Dashboard() {
                         <div className="border border-[var(--line)] bg-[#fbfaf6] p-6 sm:p-8">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-sm uppercase tracking-[0.18em] text-[var(--ink-muted)]">Subjects</p>
+                                    <p className="text-sm uppercase tracking-[0.18em] text-[var(--ink-muted)]">
+                                        Subjects
+                                    </p>
                                     <h2 className="mt-2 text-3xl font-semibold tracking-tight">Your study shelf</h2>
                                 </div>
                                 <span className="rounded-full border border-[var(--line)] px-3 py-1 text-xs font-medium text-[var(--forest)]">
@@ -306,7 +316,9 @@ export default function Dashboard() {
                                             style={{ backgroundColor: selectedSubject.colorHex }}
                                         />
                                         <div>
-                                            <p className="text-sm uppercase tracking-[0.18em] text-[var(--ink-muted)]">Selected subject</p>
+                                            <p className="text-sm uppercase tracking-[0.18em] text-[var(--ink-muted)]">
+                                                Selected subject
+                                            </p>
                                             <h3 className="mt-1 text-2xl font-semibold">{selectedSubject.name}</h3>
                                         </div>
                                     </div>
@@ -317,15 +329,23 @@ export default function Dashboard() {
 
                                 <div className="mt-5 grid gap-3 sm:grid-cols-3">
                                     <div className="rounded-2xl border border-[var(--line)] bg-white p-3">
-                                        <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--ink-muted)]">Semester</p>
+                                        <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+                                            Semester
+                                        </p>
                                         <p className="mt-2 text-sm font-medium">{selectedSubject.semester || "—"}</p>
                                     </div>
                                     <div className="rounded-2xl border border-[var(--line)] bg-white p-3">
-                                        <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--ink-muted)]">Status</p>
-                                        <p className="mt-2 text-sm font-medium">{selectedSubject.archived ? "Archived" : "Active"}</p>
+                                        <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+                                            Status
+                                        </p>
+                                        <p className="mt-2 text-sm font-medium">
+                                            {selectedSubject.archived ? "Archived" : "Active"}
+                                        </p>
                                     </div>
                                     <div className="rounded-2xl border border-[var(--line)] bg-white p-3">
-                                        <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--ink-muted)]">Updated</p>
+                                        <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--ink-muted)]">
+                                            Updated
+                                        </p>
                                         <p className="mt-2 text-sm font-medium">
                                             {new Date(selectedSubject.updatedAt).toLocaleDateString("vi-VN")}
                                         </p>
@@ -333,7 +353,9 @@ export default function Dashboard() {
                                 </div>
 
                                 {selectedSubject.description && (
-                                    <p className="mt-5 text-sm leading-6 text-[var(--ink-muted)]">{selectedSubject.description}</p>
+                                    <p className="mt-5 text-sm leading-6 text-[var(--ink-muted)]">
+                                        {selectedSubject.description}
+                                    </p>
                                 )}
                             </div>
                         )}
@@ -466,7 +488,9 @@ export default function Dashboard() {
                                 </p>
                                 <div className="mt-3 space-y-2">
                                     {mediaItems.length === 0 ? (
-                                        <p className="text-sm text-[var(--ink-muted)]">Chưa có file nào trong môn học này.</p>
+                                        <p className="text-sm text-[var(--ink-muted)]">
+                                            Chưa có file nào trong môn học này.
+                                        </p>
                                     ) : (
                                         mediaItems.map((media) => (
                                             <div
@@ -476,7 +500,9 @@ export default function Dashboard() {
                                                 <div className="min-w-0 flex-1">
                                                     <p className="truncate text-sm font-medium">{media.fileName}</p>
                                                     {media.caption && (
-                                                        <p className="truncate text-xs text-[var(--ink-muted)]">{media.caption}</p>
+                                                        <p className="truncate text-xs text-[var(--ink-muted)]">
+                                                            {media.caption}
+                                                        </p>
                                                     )}
                                                 </div>
                                                 <div className="flex items-center gap-2">
@@ -537,7 +563,9 @@ export default function Dashboard() {
                                                 style={{ backgroundColor: subject.colorHex }}
                                             />
                                             <h3 className="text-lg font-semibold">{subject.name}</h3>
-                                            <span className="text-xs text-[var(--ink-muted)]">{subjectMedia.length}</span>
+                                            <span className="text-xs text-[var(--ink-muted)]">
+                                                {subjectMedia.length}
+                                            </span>
                                         </div>
                                         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                                             {subjectMedia.map((media) => (
@@ -558,7 +586,9 @@ export default function Dashboard() {
                                                     <div className="p-3">
                                                         <p className="truncate text-sm font-medium">{media.fileName}</p>
                                                         {media.caption && (
-                                                            <p className="mt-1 truncate text-xs text-[var(--ink-muted)]">{media.caption}</p>
+                                                            <p className="mt-1 truncate text-xs text-[var(--ink-muted)]">
+                                                                {media.caption}
+                                                            </p>
                                                         )}
                                                     </div>
                                                 </a>
