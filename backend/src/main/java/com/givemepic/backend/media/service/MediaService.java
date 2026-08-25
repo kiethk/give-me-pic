@@ -19,6 +19,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -52,29 +53,31 @@ public class MediaService {
     }
 
     @Transactional
-    public MediaResponse upload(UUID userId, UUID subjectId, String caption, MultipartFile file) {
-        validateSubjectOwnership(userId, subjectId);
+    public MediaResponse upload(UUID userId, UUID subjectId, String caption, UUID clientUploadId, MultipartFile file) {
+        if (clientUploadId != null) {
+            Optional<Media> existing = mediaRepository.findByUserIdAndClientUploadId(userId, clientUploadId);
+            if (existing.isPresent()) {
+                String downloadUrl = objectStorageService.createDownloadUrl(existing.get().getStoragePath());
+                return MediaResponse.from(existing.get(), downloadUrl);
+            }
+        }
 
+        validateSubjectOwnership(userId, subjectId);
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "File không được để trống");
         }
-
         if (file.getContentType() == null || !file.getContentType().startsWith("image/")) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Chỉ hỗ trợ file hình ảnh");
         }
-
         if (file.getSize() > maxFileSizeBytes) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ảnh vượt quá dung lượng cho phép");
         }
-
         String originalName = Objects.requireNonNullElse(file.getOriginalFilename(), "upload");
         String sanitizedName = originalName.replace("\\", "/");
         String storedName = UUID.randomUUID() + "_" + sanitizedName.substring(sanitizedName.lastIndexOf('/') + 1);
         String objectKey = userId + "/" + subjectId + "/" + storedName;
-
         try {
             objectStorageService.store(objectKey, file);
-
             Media media = Media.builder()
                     .userId(userId)
                     .subjectId(subjectId)
@@ -85,11 +88,20 @@ public class MediaService {
                     .caption(caption)
                     .storagePath(objectKey)
                     .url(objectKey)
+                    .clientUploadId(clientUploadId)
                     .build();
-
             Media savedMedia = mediaRepository.save(media);
             eventPublisher.publishEvent(new MediaUploadedEvent(savedMedia.getId()));
             return MediaResponse.from(savedMedia, objectStorageService.createDownloadUrl(objectKey));
+        } catch (org.springframework.dao.DataIntegrityViolationException ex) {
+            if (clientUploadId != null) {
+                Optional<Media> existing = mediaRepository.findByUserIdAndClientUploadId(userId, clientUploadId);
+                if (existing.isPresent()) {
+                    String downloadUrl = objectStorageService.createDownloadUrl(existing.get().getStoragePath());
+                    return MediaResponse.from(existing.get(), downloadUrl);
+                }
+            }
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Client upload ID conflict", ex);
         } catch (RuntimeException ex) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Không thể lưu file vào storage", ex);
         }

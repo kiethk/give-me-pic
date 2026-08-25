@@ -13,9 +13,9 @@ import {
     logout,
     MediaItem,
     Subject,
-    uploadMedia,
     UserProfile,
 } from "@/lib/api-client";
+import { useUploadQueue } from "@/lib/use-upload-queue";
 
 const defaultForm = {
     name: "",
@@ -36,9 +36,17 @@ export default function Dashboard() {
     const [form, setForm] = useState(defaultForm);
     const [error, setError] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [isUploadingMedia, setIsUploadingMedia] = useState(false);
     const [isLoadingSubjects, setIsLoadingSubjects] = useState(true);
     const [isRemovingMedia, setIsRemovingMedia] = useState<Record<string, boolean>>({});
+
+    const { queue, isOnline, isProcessing, addToQueue, retryFailed } = useUploadQueue(() => {
+        // Called after each successful upload — refresh media lists
+        if (selectedSubjectId) loadMediaForSubject(selectedSubjectId);
+        loadAllMedia();
+    });
+
+    const pendingQueue = queue.filter((u) => u.status === "pending" || u.status === "uploading");
+    const failedQueue = queue.filter((u) => u.status === "failed");
 
     const selectedSubject = subjects.find((subject) => subject.id === selectedSubjectId) ?? null;
 
@@ -126,17 +134,12 @@ export default function Dashboard() {
         }
 
         setError("");
-        setIsUploadingMedia(true);
-
         try {
-            await uploadMedia(selectedSubjectId, file, caption || undefined);
+            await addToQueue(selectedSubjectId, file, caption || undefined);
             setCaption("");
             setFile(null);
-            await Promise.all([loadMediaForSubject(selectedSubjectId), loadAllMedia()]);
         } catch (uploadError) {
-            setError(uploadError instanceof Error ? uploadError.message : "Không thể upload ảnh.");
-        } finally {
-            setIsUploadingMedia(false);
+            setError(uploadError instanceof Error ? uploadError.message : "Không thể xếp hàng upload.");
         }
     }
 
@@ -440,6 +443,59 @@ export default function Dashboard() {
                             <p className="text-sm uppercase tracking-[0.18em] text-[var(--ink-muted)]">Media</p>
                             <h2 className="mt-2 text-3xl font-semibold tracking-tight">Upload to subject</h2>
 
+                            {/* ── Offline / sync status banner ── */}
+                            {!isOnline && (
+                                <div className="mt-4 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                                    <span className="text-base">📶</span>
+                                    <span>Không có kết nối — ảnh sẽ được lưu và tự động gửi khi online lại.</span>
+                                </div>
+                            )}
+
+                            {isOnline && isProcessing && (
+                                <div className="mt-4 flex items-center gap-2 rounded-xl border border-[var(--line)] bg-[#eef4ee] px-4 py-3 text-sm text-[var(--forest)]">
+                                    <span className="animate-spin text-base">⟳</span>
+                                    <span>Đang gửi ảnh đang chờ...</span>
+                                </div>
+                            )}
+
+                            {/* ── Pending / failed queue items ── */}
+                            {pendingQueue.length > 0 && (
+                                <div className="mt-4 space-y-2">
+                                    {pendingQueue.map((item) => (
+                                        <div
+                                            key={item.clientUploadId}
+                                            className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2"
+                                        >
+                                            <span className="text-xs font-medium uppercase tracking-[0.12em] text-amber-700">
+                                                {item.status === "uploading" ? "Đang gửi" : "Chờ mạng"}
+                                            </span>
+                                            <p className="min-w-0 flex-1 truncate text-sm text-amber-900">{item.fileName}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {failedQueue.length > 0 && (
+                                <div className="mt-4 space-y-2">
+                                    {failedQueue.map((item) => (
+                                        <div
+                                            key={item.clientUploadId}
+                                            className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2"
+                                        >
+                                            <span className="text-xs font-medium uppercase tracking-[0.12em] text-red-700">Lỗi</span>
+                                            <p className="min-w-0 flex-1 truncate text-sm text-red-900">{item.fileName}</p>
+                                        </div>
+                                    ))}
+                                    <button
+                                        type="button"
+                                        onClick={retryFailed}
+                                        className="text-xs font-medium text-[var(--coral)] underline underline-offset-4"
+                                    >
+                                        Thử lại tất cả
+                                    </button>
+                                </div>
+                            )}
+
                             {selectedSubjectId ? (
                                 <form onSubmit={handleUploadMedia} className="mt-6 space-y-5">
                                     <div className="rounded-2xl border border-dashed border-[var(--line)] bg-white p-4">
@@ -470,10 +526,10 @@ export default function Dashboard() {
 
                                     <button
                                         type="submit"
-                                        disabled={isUploadingMedia || !file}
+                                        disabled={!file}
                                         className="flex h-12 w-full items-center justify-center bg-[var(--forest)] px-5 font-semibold text-white transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
                                     >
-                                        {isUploadingMedia ? "Uploading..." : "Upload"}
+                                        {isOnline ? "Upload" : "Lưu để gửi sau"}
                                     </button>
                                 </form>
                             ) : (

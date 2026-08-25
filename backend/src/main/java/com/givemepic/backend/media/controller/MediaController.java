@@ -41,8 +41,9 @@ public class MediaController {
             @AuthenticationPrincipal UUID userId,
             @RequestParam UUID subjectId,
             @RequestParam(required = false) String caption,
+            @RequestParam(required = false) UUID clientUploadId,
             @RequestPart("file") MultipartFile file) {
-        MediaResponse response = mediaService.upload(userId, subjectId, caption, file);
+        MediaResponse response = mediaService.upload(userId, subjectId, caption, clientUploadId, file);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 

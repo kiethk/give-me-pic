@@ -154,12 +154,20 @@ export async function getMedia(subjectId?: string) {
     });
 }
 
-export async function uploadMedia(subjectId: string, file: File, caption?: string) {
+export async function uploadMedia(
+    subjectId: string,
+    file: File,
+    caption?: string,
+    clientUploadId?: string,
+) {
     const formData = new FormData();
     formData.append("subjectId", subjectId);
     formData.append("file", file);
     if (caption) {
         formData.append("caption", caption);
+    }
+    if (clientUploadId) {
+        formData.append("clientUploadId", clientUploadId);
     }
 
     const response = await fetch(`${apiUrl}/api/media/upload`, {

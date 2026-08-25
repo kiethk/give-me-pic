@@ -52,6 +52,9 @@ public class Media {
     @Column(name = "storage_path", nullable = false, length = 500)
     private String storagePath;
 
+    @Column(name = "client_upload_id", unique = true)
+    private UUID clientUploadId;
+
     @Column(name = "url", nullable = false, length = 500)
     private String url;
 
