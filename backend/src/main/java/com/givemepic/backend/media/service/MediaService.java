@@ -121,7 +121,7 @@ public class MediaService {
     }
 
     @Transactional
-    public void retryOcr(UUID userId, UUID mediaId) {
+    public void retryProcessing(UUID userId, UUID mediaId) {
         Media media = mediaRepository.findById(mediaId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy file"));
         if (!media.getUserId().equals(userId)) {
@@ -130,8 +130,10 @@ public class MediaService {
 
         media.setOcrStatus("pending");
         media.setOcrError(null);
+        media.setEmbeddingStatus("pending");
+        media.setEmbeddingError(null);
         mediaRepository.save(media);
-        ocrProcessingService.retry(mediaId);
+        eventPublisher.publishEvent(new MediaUploadedEvent(media.getId()));
     }
 
     private Subject validateSubjectOwnership(UUID userId, UUID subjectId) {

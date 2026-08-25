@@ -15,6 +15,8 @@ public record MediaResponse(
         String url,
         String ocrStatus,
         String ocrError,
+        String embeddingStatus,
+        String embeddingError,
         Instant createdAt
 ) {
     public static MediaResponse from(Media media) {
@@ -32,6 +34,8 @@ public record MediaResponse(
                 url,
                 media.getOcrStatus(),
                 media.getOcrError(),
+                media.getEmbeddingStatus(),
+                media.getEmbeddingError(),
                 media.getCreatedAt()
         );
     }

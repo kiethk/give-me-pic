@@ -22,10 +22,13 @@ import java.util.UUID;
 public class ChunkingService {
 
     private final ChunkCreationService chunkCreationService;
+    private final DocumentChunkRepository documentChunkRepository;
 
     @Async("ocrTaskExecutor")
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleOcrCompleted(OcrCompletedEvent event) {
+        documentChunkRepository.deleteByMediaId(event.mediaId());
         chunkCreationService.createChunks(event.mediaId(), event.ocrResultId());
     }
 }

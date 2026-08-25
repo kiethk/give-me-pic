@@ -21,8 +21,4 @@ public class OcrProcessingService {
         ocrTransactionService.process(event.mediaId());
     }
 
-    @Async("ocrTaskExecutor")
-    public void retry(UUID mediaId) {
-        ocrTransactionService.process(mediaId);
-    }
 }

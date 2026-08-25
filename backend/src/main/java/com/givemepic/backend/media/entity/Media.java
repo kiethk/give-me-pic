@@ -65,6 +65,13 @@ public class Media {
     @Column(name = "ocr_error")
     private String ocrError;
 
+    @Column(name = "embedding_status", nullable = false, length = 20)
+    @Builder.Default
+    private String embeddingStatus = "pending";
+
+    @Column(name = "embedding_error")
+    private String embeddingError;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

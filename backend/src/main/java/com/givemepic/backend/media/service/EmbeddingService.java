@@ -41,6 +41,8 @@ public class EmbeddingService {
      * @return the number of chunks successfully embedded in this run
      */
     public int embedMedia(UUID mediaId) {
+        setMediaEmbeddingStatus(mediaId, "processing", null);
+        
         List<DocumentChunk> chunks = documentChunkRepository.findByMediaIdOrderByChunkIndexAsc(mediaId);
         int successCount = 0;
 
@@ -71,6 +73,13 @@ public class EmbeddingService {
         }
 
         log.info("embedMedia({}): {}/{} chunks embedded successfully", mediaId, successCount, chunks.size());
+        
+        if (successCount == chunks.size()) {
+            setMediaEmbeddingStatus(mediaId, "completed", null);
+        } else {
+            setMediaEmbeddingStatus(mediaId, "failed", "Một số đoạn văn bản không thể xử lý");
+        }
+        
         return successCount;
     }
 
@@ -82,6 +91,12 @@ public class EmbeddingService {
         jdbcTemplate.update(
                 "UPDATE document_chunks SET embedding_status = ?, embedding_error = ? WHERE id = ?",
                 status, errorMsg, chunkId);
+    }
+
+    private void setMediaEmbeddingStatus(UUID mediaId, String status, String errorMsg) {
+        jdbcTemplate.update(
+                "UPDATE media_files SET embedding_status = ?, embedding_error = ? WHERE id = ?",
+                status, errorMsg, mediaId);
     }
 
     private String toVectorLiteral(List<Float> vector) {
