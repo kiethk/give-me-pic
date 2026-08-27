@@ -20,12 +20,12 @@ Last updated: 2026-08-19
 - [x] Media module (backend): `Media` entity, upload endpoint to MinIO, list endpoint
 - [x] Phase 2: RAG Pipeline (OCR, Chunking, Embedding, Similarity search, POST /api/chat)
 - [x] Phase 2: Frontend chat UI with citations
+- [x] Frontend: register/login pages calling the auth API
+- [x] Frontend: capture/upload page, photo grid grouped by subject
+- [x] Phase 3: Reliability & Offline-First (Rate limiting queue, Error states for every async step)
+- [x] Backend tests for auth module
 
 ## In Progress
-
-- [ ] Phase 3: Reliability & Offline-First (Rate limiting, Error states)
-
-- [ ] Backend tests for auth module
 
 ## Technical Debt / TODO
 
@@ -36,14 +36,10 @@ Last updated: 2026-08-19
 
 ## Not Started
 
-- [ ] Frontend: register/login pages calling the auth API
-- [ ] Frontend: capture/upload page, photo grid grouped by subject
-- [ ] Phase 3: Error states designed for every async step
 - [ ] Phase 4: PWA (installable web app, before native mobile)
 - [ ] Phase 5: Billing/subscription tracking (`subscriptions`, `usage_monthly`)
 - [ ] Phase 6: Production Hardening
 - [ ] Phase 7: Native Mobile App
-- [ ] Billing/subscription tracking (`subscriptions`, `usage_monthly`)
 
 ## Locked-in Decisions
 
