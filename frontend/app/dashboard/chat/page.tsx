@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import {
     askChat,
     ChatCitation,
@@ -9,26 +8,24 @@ import {
     ChatSession,
     getChatSessionMessages,
     getChatSessions,
-    getProfile,
     getSubjects,
     Subject,
-    UserProfile,
 } from "@/lib/api-client";
 
 export default function ChatPage() {
-    const [profile, setProfile] = useState<UserProfile | null>(null);
     const [subjects, setSubjects] = useState<Subject[]>([]);
     const [sessions, setSessions] = useState<ChatSession[]>([]);
     const [messages, setMessages] = useState<ChatHistoryMessage[]>([]);
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
     const [subjectFilter, setSubjectFilter] = useState<string>("");
     const [question, setQuestion] = useState("");
-    const [error, setError] = useState("");
+    const [error, setError] = useState(""); // global error — only for full-page failures
     const [isSending, setIsSending] = useState(false);
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
     const [previewCitation, setPreviewCitation] = useState<ChatCitation | null>(null);
+    // Stores the last failed send payload so it can be retried inline
+    const [failedPayload, setFailedPayload] = useState<{ question: string; sessionId: string | null; subjectId: string | null } | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
-
     async function loadSessions() {
         try {
             setSessions(await getChatSessions());
@@ -58,9 +55,9 @@ export default function ChatPage() {
         const trimmed = question.trim();
         if (!trimmed || isSending) return;
 
-        setError("");
         setIsSending(true);
         setQuestion("");
+        setFailedPayload(null);
 
         const tempUserMessage: ChatHistoryMessage = {
             messageId: `temp-${Date.now()}`,
@@ -71,12 +68,14 @@ export default function ChatPage() {
         };
         setMessages((current) => [...current, tempUserMessage]);
 
+        const payload = {
+            question: trimmed,
+            sessionId: currentSessionId,
+            subjectId: subjectFilter || null,
+        };
+
         try {
-            const response = await askChat({
-                question: trimmed,
-                sessionId: currentSessionId,
-                subjectId: subjectFilter || null,
-            });
+            const response = await askChat(payload);
 
             if (!currentSessionId) {
                 setCurrentSessionId(response.sessionId);
@@ -92,19 +91,61 @@ export default function ChatPage() {
             };
             setMessages((current) => [...current, assistantMessage]);
         } catch (sendError) {
-            setError(sendError instanceof Error ? sendError.message : "Không thể gửi câu hỏi.");
+            const errorText = sendError instanceof Error ? sendError.message : "Could not send question.";
+            // Append an inline error bubble instead of a global banner
+            const errorMessage: ChatHistoryMessage = {
+                messageId: `error-${Date.now()}`,
+                role: "assistant",
+                content: `__error__${errorText}`,
+                createdAt: new Date().toISOString(),
+                citations: [],
+            };
+            setMessages((current) => [...current, errorMessage]);
+            setFailedPayload(payload);
+        } finally {
+            setIsSending(false);
+        }
+    }
+
+    async function handleRetry() {
+        if (!failedPayload || isSending) return;
+        // Remove the last error bubble before retrying
+        setMessages((current) => current.filter((m) => !m.content.startsWith("__error__")));
+
+        setIsSending(true);
+        setFailedPayload(null);
+        try {
+            const response = await askChat(failedPayload);
+            if (!currentSessionId) {
+                setCurrentSessionId(response.sessionId);
+                await loadSessions();
+            }
+            const assistantMessage: ChatHistoryMessage = {
+                messageId: response.messageId,
+                role: "assistant",
+                content: response.answer,
+                createdAt: new Date().toISOString(),
+                citations: response.citations,
+            };
+            setMessages((current) => [...current, assistantMessage]);
+        } catch (retryError) {
+            const errorText = retryError instanceof Error ? retryError.message : "Could not send question.";
+            const errorMessage: ChatHistoryMessage = {
+                messageId: `error-${Date.now()}`,
+                role: "assistant",
+                content: `__error__${errorText}`,
+                createdAt: new Date().toISOString(),
+                citations: [],
+            };
+            setMessages((current) => [...current, errorMessage]);
+            setFailedPayload(failedPayload);
         } finally {
             setIsSending(false);
         }
     }
 
     useEffect(() => {
-        getProfile()
-            .then((profileData) => {
-                setProfile(profileData);
-                return Promise.all([loadSessions(), getSubjects().then(setSubjects)]);
-            })
-            .catch(() => setError("Bạn cần đăng nhập để xem trang này."));
+        Promise.all([getChatSessions().then(setSessions), getSubjects().then(setSubjects)]);
     }, []);
 
     useEffect(() => {
@@ -118,69 +159,68 @@ export default function ChatPage() {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
 
-    if (!profile) {
+    if (!subjects && !sessions) {
         return (
-            <main className="flex min-h-screen items-center justify-center bg-[var(--background)] text-[var(--ink-muted)]">
-                Loading...
-            </main>
+            <div className="flex h-full items-center justify-center text-sm text-[#727687]">
+                Loading…
+            </div>
         );
     }
 
     return (
-        <main className="flex h-screen bg-[var(--background)]">
-            {/* Sidebar */}
-            <aside className="flex w-72 flex-col border-r border-[var(--line)] bg-[#fbfaf6] p-5">
-                <Link
-                    href="/dashboard"
-                    className="text-sm font-medium text-[var(--forest)] underline underline-offset-4"
-                >
-                    ← Back to dashboard
-                </Link>
+        <div className="flex h-full">
+            {/* ── Sessions sidebar ── */}
+            <aside className="flex w-64 shrink-0 flex-col border-r border-[#e2e8f0] bg-white">
+                <div className="border-b border-[#e2e8f0] px-4 py-4">
+                    <button
+                        onClick={startNewChat}
+                        className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#0050cb] py-2.5 text-sm font-semibold text-white hover:bg-[#0066ff] transition-colors"
+                    >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                        </svg>
+                        New chat
+                    </button>
+                </div>
 
-                <button
-                    onClick={startNewChat}
-                    className="mt-5 flex h-11 w-full items-center justify-center bg-[var(--coral)] px-4 font-semibold text-white transition-transform hover:-translate-y-0.5"
-                >
-                    + New chat
-                </button>
-
-                <div className="mt-5">
-                    <label className="block text-xs font-medium uppercase tracking-[0.14em] text-[var(--ink-muted)]">
-                        Phạm vi tra cứu
+                <div className="px-3 py-3">
+                    <label className="block text-[11px] font-semibold uppercase tracking-wider text-[#727687] px-2">
+                        Search scope
                     </label>
                     <select
                         value={subjectFilter}
-                        onChange={(event) => setSubjectFilter(event.target.value)}
-                        className="mt-2 h-10 w-full border border-[var(--line)] bg-white px-2 text-sm outline-none focus:border-[var(--forest)]"
+                        onChange={(e) => setSubjectFilter(e.target.value)}
+                        className="mt-1.5 h-9 w-full rounded-lg border border-[#e2e8f0] bg-[#f9f9ff] px-2.5 text-sm text-[#424656] outline-none transition focus:border-[#0050cb]"
                     >
-                        <option value="">Toàn bộ dữ liệu</option>
-                        {subjects.map((subject) => (
-                            <option key={subject.id} value={subject.id}>
-                                {subject.name}
-                            </option>
+                        <option value="">All subjects</option>
+                        {subjects.map((s) => (
+                            <option key={s.id} value={s.id}>{s.name}</option>
                         ))}
                     </select>
                 </div>
 
-                <div className="mt-6 flex-1 overflow-y-auto">
-                    <p className="text-xs font-medium uppercase tracking-[0.14em] text-[var(--ink-muted)]">
-                        Lịch sử hội thoại
+                <div className="flex-1 overflow-y-auto px-3 pb-3">
+                    <p className="px-2 text-[11px] font-semibold uppercase tracking-wider text-[#727687]">
+                        History
                     </p>
-                    <div className="mt-3 space-y-1">
+                    <div className="mt-2 space-y-0.5">
                         {sessions.length === 0 ? (
-                            <p className="text-sm text-[var(--ink-muted)]">Chưa có hội thoại nào.</p>
+                            <p className="px-2 py-2 text-sm text-[#727687]">No conversations yet.</p>
                         ) : (
                             sessions.map((session) => (
                                 <button
                                     key={session.sessionId}
                                     onClick={() => setCurrentSessionId(session.sessionId)}
-                                    className={`block w-full truncate rounded-lg px-3 py-2 text-left text-sm ${
+                                    className={`flex w-full items-center rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
                                         currentSessionId === session.sessionId
-                                            ? "bg-[#eef4ee] font-medium text-[var(--forest)]"
-                                            : "text-[var(--ink-muted)] hover:bg-white"
+                                            ? "bg-[#e7eeff] font-medium text-[#0050cb]"
+                                            : "text-[#424656] hover:bg-[#f0f3ff]"
                                     }`}
                                 >
-                                    {session.title || "Hội thoại mới"}
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mr-2 shrink-0 opacity-60">
+                                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                                    </svg>
+                                    <span className="truncate">{session.title || "New conversation"}</span>
                                 </button>
                             ))
                         )}
@@ -188,94 +228,128 @@ export default function ChatPage() {
                 </div>
             </aside>
 
-            {/* Main chat area */}
-            <div className="flex flex-1 flex-col">
-                <header className="border-b border-[var(--line)] px-8 py-5">
-                    <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[var(--coral)]">
-                        Give Me Pic
-                    </p>
-                    <h1 className="mt-2 text-3xl font-semibold tracking-tight">Ask your notes</h1>
-                </header>
-
+            {/* ── Chat area ── */}
+            <div className="flex flex-1 flex-col overflow-hidden">
+                {/* Error banner */}
                 {error && (
-                    <div className="mx-8 mt-4 border border-[var(--coral)] bg-[#fdf0ee] px-4 py-3 text-sm text-[var(--coral)]">
+                    <div className="mx-6 mt-4 rounded-xl border border-[#ffdad6] bg-[#fff5f5] px-4 py-3 text-sm text-[#93000a]">
                         {error}
                     </div>
                 )}
 
-                <div className="flex-1 overflow-y-auto px-8 py-6">
+                {/* Messages */}
+                <div className="flex-1 overflow-y-auto px-6 py-6">
                     {isLoadingHistory ? (
-                        <p className="text-sm text-[var(--ink-muted)]">Đang tải hội thoại...</p>
+                        <div className="flex h-full items-center justify-center">
+                            <p className="text-sm text-[#727687]">Loading conversation…</p>
+                        </div>
                     ) : messages.length === 0 ? (
-                        <div className="flex h-full flex-col items-center justify-center text-center text-[var(--ink-muted)]">
-                            <p className="text-lg font-medium">Bạn muốn hỏi gì về tài liệu đã học?</p>
-                            <p className="mt-1 text-sm">Câu trả lời sẽ trích dẫn đúng ảnh gốc bạn đã upload.</p>
+                        <div className="flex h-full flex-col items-center justify-center text-center">
+                            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#e7eeff]">
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0050cb" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                                </svg>
+                            </div>
+                            <p className="mt-4 text-base font-semibold text-[#111c2d]">What do you want to ask about your notes?</p>
+                            <p className="mt-1 text-sm text-[#727687]">Answers will cite the exact photos you uploaded.</p>
                         </div>
                     ) : (
-                        <div className="space-y-5">
-                            {messages.map((message) => (
-                                <div
-                                    key={message.messageId}
-                                    className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
-                                >
-                                    <div
-                                        className={`max-w-2xl px-4 py-3 text-sm ${
-                                            message.role === "user"
-                                                ? "bg-[var(--forest)] text-white"
-                                                : "border border-[var(--line)] bg-[#fbfaf6]"
-                                        }`}
-                                    >
-                                        <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                        <div className="space-y-4">
+                            {messages.map((message) => {
+                                const isError = message.content.startsWith("__error__");
+                                const displayContent = isError
+                                    ? message.content.replace("__error__", "")
+                                    : message.content;
 
-                                        {message.role === "assistant" && message.citations.length > 0 && (
-                                            <div className="mt-3 border-t border-[var(--line)] pt-3">
-                                                <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--ink-muted)]">
-                                                    Nguồn trích dẫn
-                                                </p>
-                                                <div className="mt-2 flex flex-wrap gap-2">
-                                                    {message.citations.map((citation) => (
+                                return (
+                                    <div
+                                        key={message.messageId}
+                                        className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+                                    >
+                                        <div
+                                            className={`max-w-2xl rounded-2xl px-4 py-3 text-sm ${
+                                                message.role === "user"
+                                                    ? "bg-[#0050cb] text-white"
+                                                    : isError
+                                                      ? "border border-[#ffdad6] bg-[#fff5f5] text-[#93000a]"
+                                                      : "border border-[#e2e8f0] bg-white text-[#111c2d]"
+                                            }`}
+                                        >
+                                            {isError ? (
+                                                <div className="flex items-center gap-3">
+                                                    <span>⚠ {displayContent}</span>
+                                                    {failedPayload && (
                                                         <button
-                                                            key={citation.chunkId}
                                                             type="button"
-                                                            onClick={() => setPreviewCitation(citation)}
-                                                            className="flex items-center gap-2 border border-[var(--line)] bg-white px-2 py-1 text-left hover:-translate-y-0.5 transition-transform"
+                                                            onClick={handleRetry}
+                                                            disabled={isSending}
+                                                            className="shrink-0 rounded-md bg-[#0050cb] px-2.5 py-1 text-xs font-semibold text-white hover:bg-[#0066ff] disabled:opacity-50 transition-colors"
                                                         >
-                                                            <img
-                                                                src={citation.imageUrl}
-                                                                alt={citation.fileName}
-                                                                className="h-6 w-6 object-cover"
-                                                            />
-                                                            <span className="max-w-[120px] truncate text-xs font-medium">
-                                                                {citation.fileName}
-                                                            </span>
+                                                            {isSending ? "Retrying…" : "Retry"}
                                                         </button>
-                                                    ))}
+                                                    )}
                                                 </div>
-                                            </div>
-                                        )}
+                                            ) : (
+                                                <p className="whitespace-pre-wrap leading-relaxed">{displayContent}</p>
+                                            )}
+
+                                            {!isError && message.role === "assistant" && message.citations.length > 0 && (
+                                                <div className="mt-3 border-t border-[#e2e8f0] pt-3">
+                                                    <p className="text-[11px] font-semibold uppercase tracking-wider text-[#727687]">Sources</p>
+                                                    <div className="mt-2 flex flex-wrap gap-2">
+                                                        {message.citations.map((citation) => (
+                                                            <button
+                                                                key={citation.chunkId}
+                                                                type="button"
+                                                                onClick={() => setPreviewCitation(citation)}
+                                                                className="flex items-center gap-2 rounded-lg border border-[#e2e8f0] bg-[#f9f9ff] px-2 py-1.5 text-left hover:bg-[#e7eeff] transition-colors"
+                                                            >
+                                                                <img
+                                                                    src={citation.imageUrl}
+                                                                    alt={citation.fileName}
+                                                                    className="h-6 w-6 rounded object-cover"
+                                                                />
+                                                                <span className="max-w-[110px] truncate text-xs font-medium text-[#424656]">
+                                                                    {citation.fileName}
+                                                                </span>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                             <div ref={messagesEndRef} />
                         </div>
                     )}
                 </div>
 
-                <form onSubmit={handleSend} className="border-t border-[var(--line)] px-8 py-5">
-                    <div className="flex gap-3">
+                {/* Input bar */}
+                <form onSubmit={handleSend} className="border-t border-[#e2e8f0] bg-white px-6 py-4">
+                    <div className="flex items-center gap-3 rounded-xl border border-[#c2c6d8] bg-[#f9f9ff] px-4 py-2 transition-colors focus-within:border-[#0050cb] focus-within:ring-2 focus-within:ring-[#0050cb]/15">
                         <input
                             value={question}
-                            onChange={(event) => setQuestion(event.target.value)}
-                            placeholder="Nhập câu hỏi tự nhiên..."
+                            onChange={(e) => setQuestion(e.target.value)}
+                            placeholder="Ask anything about your notes…"
                             disabled={isSending}
-                            className="h-12 flex-1 border-b border-[var(--line)] bg-transparent px-1 outline-none transition-colors focus:border-[var(--forest)] disabled:opacity-60"
+                            className="flex-1 bg-transparent text-sm text-[#111c2d] placeholder:text-[#727687] outline-none disabled:opacity-60"
                         />
                         <button
                             type="submit"
                             disabled={isSending || !question.trim()}
-                            className="flex h-12 items-center justify-center bg-[var(--coral)] px-6 font-semibold text-white transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#0050cb] text-white hover:bg-[#0066ff] disabled:opacity-50 transition-colors"
                         >
-                            {isSending ? "Đang trả lời..." : "Gửi"}
+                            {isSending ? (
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="animate-spin" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                                </svg>
+                            ) : (
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                                </svg>
+                            )}
                         </button>
                     </div>
                 </form>
@@ -288,28 +362,27 @@ export default function ChatPage() {
                     onClick={() => setPreviewCitation(null)}
                 >
                     <div
-                        className="max-h-[85vh] max-w-2xl overflow-hidden border border-[var(--line)] bg-white"
-                        onClick={(event) => event.stopPropagation()}
+                        className="max-h-[85vh] max-w-2xl overflow-hidden rounded-2xl border border-[#e2e8f0] bg-white shadow-2xl"
+                        onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="flex items-center justify-between border-b border-[var(--line)] px-4 py-3">
-                            <p className="truncate text-sm font-medium">{previewCitation.fileName}</p>
-                            <button
-                                onClick={() => setPreviewCitation(null)}
-                                className="text-lg font-bold text-[var(--ink-muted)]"
-                            >
-                                &times;
+                        <div className="flex items-center justify-between border-b border-[#e2e8f0] px-5 py-3">
+                            <p className="truncate text-sm font-semibold text-[#111c2d]">{previewCitation.fileName}</p>
+                            <button onClick={() => setPreviewCitation(null)} className="text-[#727687] hover:text-[#111c2d] transition-colors">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                                </svg>
                             </button>
                         </div>
-                        <div className="flex max-h-[70vh] items-center justify-center overflow-auto bg-[#eef4ee] p-4">
+                        <div className="flex max-h-[70vh] items-center justify-center overflow-auto bg-[#f0f3ff] p-4">
                             <img
                                 src={previewCitation.imageUrl}
                                 alt={previewCitation.fileName}
-                                className="max-h-[65vh] object-contain"
+                                className="max-h-[65vh] rounded-lg object-contain"
                             />
                         </div>
                     </div>
                 </div>
             )}
-        </main>
+        </div>
     );
 }

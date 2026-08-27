@@ -48,6 +48,8 @@ export type MediaItem = {
     url: string;
     ocrStatus: string;
     ocrError: string | null;
+    embeddingStatus: string;
+    embeddingError: string | null;
     createdAt: string;
 };
 
@@ -188,6 +190,12 @@ export async function uploadMedia(
 export async function deleteMedia(mediaId: string) {
     return request<void>(`/api/media/${mediaId}`, {
         method: "DELETE",
+    });
+}
+
+export async function retryProcessing(mediaId: string) {
+    return request<void>(`/api/media/${mediaId}/retry`, {
+        method: "POST",
     });
 }
 

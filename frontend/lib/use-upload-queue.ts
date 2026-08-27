@@ -32,6 +32,8 @@ interface UseUploadQueue {
     isOnline: boolean;
     /** True while the auto-retry loop is running. */
     isProcessing: boolean;
+    /** Non-null when a 429 rate limit is active — shows how many seconds remain. */
+    rateLimitMessage: string | null;
     /**
      * Enqueue a file for upload. If online, starts uploading immediately.
      * If offline, stores in IndexedDB and uploads when the connection returns.
@@ -47,7 +49,9 @@ export function useUploadQueue(onUploadSuccess?: () => void): UseUploadQueue {
         typeof navigator !== "undefined" ? navigator.onLine : true,
     );
     const [isProcessing, setIsProcessing] = useState(false);
+    const [rateLimitMessage, setRateLimitMessage] = useState<string | null>(null);
     const processingRef = useRef(false); // guard against concurrent runs
+    const rateLimitUntilRef = useRef<number>(0); // epoch ms when rate limit expires
 
     // -----------------------------------------------------------------------
     // Sync IDB → React state
@@ -77,23 +81,58 @@ export function useUploadQueue(onUploadSuccess?: () => void): UseUploadQueue {
             const pending = await getUploads(["pending", "failed"]);
 
             for (const item of pending) {
-                if (!navigator.onLine) break; // network dropped again mid-loop
+                if (!navigator.onLine) break;
+
+                // Respect active rate limit — wait out the remaining time
+                const waitMs = rateLimitUntilRef.current - Date.now();
+                if (waitMs > 0) {
+                    await new Promise((resolve) => setTimeout(resolve, waitMs));
+                    setRateLimitMessage(null);
+                }
 
                 await updateStatus(item.clientUploadId, "uploading");
                 await refreshQueue();
 
                 try {
                     const file = dataUrlToFile(item.fileDataUrl, item.fileName, item.fileType);
-                    await uploadMedia(
-                        item.subjectId,
-                        file,
-                        item.caption ?? undefined,
-                        item.clientUploadId,
+                    const response = await fetch(
+                        `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"}/api/media/upload`,
+                        {
+                            method: "POST",
+                            credentials: "include",
+                            body: (() => {
+                                const fd = new FormData();
+                                fd.append("subjectId", item.subjectId);
+                                fd.append("file", file);
+                                if (item.caption) fd.append("caption", item.caption);
+                                fd.append("clientUploadId", item.clientUploadId);
+                                return fd;
+                            })(),
+                        },
                     );
+
+                    if (response.status === 429) {
+                        // Parse Retry-After header (seconds)
+                        const retryAfterSec = parseInt(response.headers.get("Retry-After") ?? "60", 10);
+                        rateLimitUntilRef.current = Date.now() + retryAfterSec * 1000;
+                        setRateLimitMessage(
+                            `Upload rate limit reached. Retrying in ${retryAfterSec} second${retryAfterSec !== 1 ? "s" : ""}.`,
+                        );
+                        // Put this item back to pending so it's retried after the wait
+                        await updateStatus(item.clientUploadId, "pending");
+                        await refreshQueue();
+                        break; // exit loop; processQueue will be called again after wait
+                    }
+
+                    if (!response.ok) {
+                        const data = await response.json().catch(() => null);
+                        throw new Error(data?.message ?? "Upload failed.");
+                    }
+
                     await removeFromQueue(item.clientUploadId);
                     onUploadSuccess?.();
                 } catch (err) {
-                    const msg = err instanceof Error ? err.message : "Upload thất bại";
+                    const msg = err instanceof Error ? err.message : "Upload failed.";
                     await updateStatus(item.clientUploadId, "failed", msg);
                 }
 
@@ -175,5 +214,5 @@ export function useUploadQueue(onUploadSuccess?: () => void): UseUploadQueue {
         }
     }, [processQueue]);
 
-    return { queue, isOnline, isProcessing, addToQueue, retryFailed };
+    return { queue, isOnline, isProcessing, rateLimitMessage, addToQueue, retryFailed };
 }
