@@ -71,11 +71,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <aside className="flex w-[220px] shrink-0 flex-col border-r border-[#e2e8f0] bg-white">
                 {/* Logo */}
                 <div className="flex h-16 items-center gap-2.5 border-b border-[#e2e8f0] px-5">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0050cb]">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
-                            <path d="M12 2a5 5 0 1 0 0 10A5 5 0 0 0 12 2zM4 20a8 8 0 0 1 16 0H4z"/>
-                        </svg>
-                    </div>
+                    <img src="/icons/icon-192x192.png" alt="Give Me Pic logo" className="h-8 w-8 rounded-lg object-cover" />
                     <span className="text-[15px] font-bold text-[#111c2d] tracking-tight">Give Me Pic</span>
                 </div>
 

@@ -5,11 +5,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       <section className="hidden w-[45%] flex-col justify-between bg-[#0050cb] p-12 text-white lg:flex">
         <div className="relative z-10">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
-                <path d="M12 2a5 5 0 1 0 0 10A5 5 0 0 0 12 2zM4 20a8 8 0 0 1 16 0H4z"/>
-              </svg>
-            </div>
+            <img src="/icons/icon-192x192.png" alt="Give Me Pic logo" className="h-10 w-10 rounded-xl object-cover shadow-sm" />
             <span className="text-lg font-bold tracking-tight">Give Me Pic</span>
           </div>
           <h1 className="mt-20 max-w-lg text-4xl font-bold leading-tight tracking-tight text-white xl:text-5xl">
@@ -43,11 +39,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         <div className="w-full max-w-[420px]">
           {/* Mobile logo */}
           <div className="mb-10 flex items-center gap-3 lg:hidden">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0050cb]">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
-                <path d="M12 2a5 5 0 1 0 0 10A5 5 0 0 0 12 2zM4 20a8 8 0 0 1 16 0H4z"/>
-              </svg>
-            </div>
+            <img src="/icons/icon-192x192.png" alt="Give Me Pic logo" className="h-10 w-10 rounded-xl object-cover shadow-sm" />
             <span className="text-xl font-bold tracking-tight text-[#111c2d]">Give Me Pic</span>
           </div>
 
