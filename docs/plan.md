@@ -24,6 +24,7 @@ Last updated: 2026-08-19
 - [x] Frontend: capture/upload page, photo grid grouped by subject
 - [x] Phase 3: Reliability & Offline-First (Rate limiting queue, Error states for every async step)
 - [x] Backend tests for auth module
+- [x] Phase 4: PWA (installable web app, offline fallback)
 
 ## In Progress
 
@@ -36,7 +37,6 @@ Last updated: 2026-08-19
 
 ## Not Started
 
-- [ ] Phase 4: PWA (installable web app, before native mobile)
 - [ ] Phase 5: Billing/subscription tracking (`subscriptions`, `usage_monthly`)
 - [ ] Phase 6: Production Hardening
 - [ ] Phase 7: Native Mobile App
