@@ -1,0 +1,22 @@
+{
+  "name": "Give Me Pic",
+  "short_name": "GiveMePic",
+  "description": "Capture, organise, and revisit your lecture notes with AI-powered search.",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f0f3ff",
+  "theme_color": "#0050cb",
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

@@ -4,12 +4,27 @@ import { ChangeEvent, DragEvent, useEffect, useRef, useState } from "react";
 import { getSubjects, Subject } from "@/lib/api-client";
 import { useUploadQueue } from "@/lib/use-upload-queue";
 
+function Thumbnail({ buffer, type, alt }: { buffer: ArrayBuffer; type: string; alt: string }) {
+    const [url, setUrl] = useState("");
+    useEffect(() => {
+        if (!buffer) return;
+        const blob = new Blob([buffer], { type });
+        const u = URL.createObjectURL(blob);
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setUrl(u);
+        return () => URL.revokeObjectURL(u);
+    }, [buffer, type]);
+    if (!url) return null;
+    return <img src={url} alt={alt} className="h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />;
+}
+
 export default function UploadPage() {
     const [subjects, setSubjects] = useState<Subject[]>([]);
     const [selectedSubjectId, setSelectedSubjectId] = useState("");
     const [caption, setCaption] = useState("");
     const [isDragging, setIsDragging] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const cameraInputRef = useRef<HTMLInputElement>(null);
 
     const { queue, isOnline, rateLimitMessage, addToQueue, retryFailed } = useUploadQueue();
 
@@ -22,17 +37,52 @@ export default function UploadPage() {
     }, []);
 
     async function processFiles(files: FileList | File[]) {
-        const arr = Array.from(files).filter((f) => f.type.startsWith("image/"));
-        if (!selectedSubjectId || arr.length === 0) return;
-        for (const file of arr) {
-            await addToQueue(selectedSubjectId, file, caption || undefined);
+        try {
+            if (files.length === 0) {
+                alert("No files selected.");
+                return;
+            }
+            const arr = Array.from(files).filter((f) => {
+                // Some mobile browsers might not set the type when capturing from camera
+                return f.type.startsWith("image/") || !f.type || f.name.toLowerCase().endsWith(".jpg") || f.name.toLowerCase().endsWith(".jpeg") || f.name.toLowerCase().endsWith(".png") || f.name.toLowerCase().endsWith(".heic");
+            });
+
+            if (arr.length === 0) {
+                alert(`No valid images found. First file type: ${files[0]?.type}, name: ${files[0]?.name}`);
+                return;
+            }
+
+            if (!selectedSubjectId) {
+                alert("Please select a subject first.");
+                return;
+            }
+
+            // EAGERLY read all array buffers to prevent iOS Safari from garbage collecting 
+            // the temporary camera files after the change event finishes.
+            const fileDataPairs = await Promise.all(
+                arr.map(async (file) => {
+                    const buffer = await file.arrayBuffer();
+                    return { file, buffer };
+                })
+            );
+
+            for (const { file, buffer } of fileDataPairs) {
+                if (file.size > 20 * 1024 * 1024) {
+                    alert(`Warning: ${file.name} is larger than 20MB (${(file.size / 1024 / 1024).toFixed(1)}MB). The upload might fail.`);
+                }
+                await addToQueue(selectedSubjectId, file, buffer, caption || undefined);
+            }
+            setCaption("");
+        } catch (error) {
+            alert(`Error processing files: ${error instanceof Error ? error.message : String(error)}`);
         }
-        setCaption("");
     }
 
     function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
         if (e.target.files) processFiles(e.target.files);
+        // Clear both inputs so the same file can be selected again
         if (fileInputRef.current) fileInputRef.current.value = "";
+        if (cameraInputRef.current) cameraInputRef.current.value = "";
     }
 
     function handleDrop(e: DragEvent) {
@@ -97,12 +147,32 @@ export default function UploadPage() {
                 />
             </div>
 
+            {/* Mobile Camera Capture */}
+            <div className="mt-6 md:mt-8">
+                <button
+                    onClick={() => cameraInputRef.current?.click()}
+                    disabled={!selectedSubjectId}
+                    className="flex w-full h-14 items-center justify-center gap-2.5 rounded-xl bg-[#0050cb] text-base font-semibold text-white shadow-md hover:bg-[#0066ff] disabled:opacity-50 transition-all active:scale-[0.98]"
+                >
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>
+                    </svg>
+                    Take Photo
+                </button>
+            </div>
+
+            <div className="mt-4 flex items-center gap-4">
+                <div className="h-px flex-1 bg-[#e2e8f0]"></div>
+                <span className="text-sm font-medium text-[#727687]">OR</span>
+                <div className="h-px flex-1 bg-[#e2e8f0]"></div>
+            </div>
+
             {/* Drop zone */}
             <div
                 onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                 onDragLeave={() => setIsDragging(false)}
                 onDrop={handleDrop}
-                className={`mt-6 flex flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed p-12 text-center transition-colors ${
+                className={`mt-4 flex flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed p-8 md:p-12 text-center transition-colors ${
                     isDragging
                         ? "border-[#0050cb] bg-[#e7eeff]"
                         : "border-[#c2c6d8] bg-white hover:border-[#0050cb] hover:bg-[#f0f3ff]"
@@ -121,9 +191,9 @@ export default function UploadPage() {
                 <button
                     onClick={() => fileInputRef.current?.click()}
                     disabled={!selectedSubjectId}
-                    className="rounded-lg bg-[#0050cb] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0066ff] disabled:opacity-50 transition-colors"
+                    className="rounded-lg bg-[#e7eeff] px-5 py-2.5 text-sm font-semibold text-[#0050cb] hover:bg-[#d6e2ff] disabled:opacity-50 transition-colors"
                 >
-                    Choose from device
+                    Choose from Gallery
                 </button>
                 <p className="text-xs text-[#727687]">Supports JPG, PNG, WEBP (max 10 MB/file)</p>
                 <input
@@ -131,6 +201,14 @@ export default function UploadPage() {
                     type="file"
                     accept="image/*"
                     multiple
+                    className="hidden"
+                    onChange={handleFileChange}
+                />
+                <input
+                    ref={cameraInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
                     className="hidden"
                     onChange={handleFileChange}
                 />
@@ -144,12 +222,7 @@ export default function UploadPage() {
                         {uploading.map((item) => (
                             <div key={item.clientUploadId} className="flex items-center gap-3 rounded-xl border border-[#e2e8f0] bg-white p-3">
                                 <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-[#e7eeff]">
-                                    <img
-                                        src={`data:${item.fileType};base64,${item.fileDataUrl.split(",")[1]}`}
-                                        alt={item.fileName}
-                                        className="h-full w-full object-cover"
-                                        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                                    />
+                                    <Thumbnail buffer={item.fileBuffer} type={item.fileType} alt={item.fileName} />
                                 </div>
                                 <div className="min-w-0 flex-1">
                                     <p className="truncate text-sm font-medium text-[#111c2d]">{item.fileName}</p>

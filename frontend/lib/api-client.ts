@@ -1,4 +1,13 @@
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+function getApiUrl() {
+    if (process.env.NEXT_PUBLIC_API_URL) {
+        return process.env.NEXT_PUBLIC_API_URL;
+    }
+    if (typeof window !== "undefined") {
+        return `${window.location.protocol}//${window.location.hostname}:8080`;
+    }
+    return "http://localhost:8080";
+}
+
 
 type AuthPayload = {
     email: string;
@@ -118,7 +127,7 @@ export async function login(payload: Omit<AuthPayload, "displayName">) {
 }
 
 export async function getProfile() {
-    const response = await fetch(`${apiUrl}/api/auth/me`, {
+    const response = await fetch(`${getApiUrl()}/api/auth/me`, {
         credentials: "include",
     });
     const data = await response.json().catch(() => null);
@@ -149,11 +158,21 @@ export async function archiveSubject(subjectId: string) {
     });
 }
 
+// Helper to ensure media URLs are absolute based on the current environment
+function ensureAbsoluteUrl(url: string) {
+    if (!url || url.startsWith("http")) return url;
+    return `${getApiUrl()}${url.startsWith("/") ? "" : "/"}${url}`;
+}
+
 export async function getMedia(subjectId?: string) {
     const query = subjectId ? `?subjectId=${encodeURIComponent(subjectId)}` : "";
-    return request<MediaItem[]>(`/api/media${query}`, {
+    const response = await request<MediaItem[]>(`/api/media${query}`, {
         method: "GET",
     });
+    return response.map(m => ({
+        ...m,
+        url: ensureAbsoluteUrl(m.url)
+    }));
 }
 
 export async function uploadMedia(
@@ -163,16 +182,14 @@ export async function uploadMedia(
     clientUploadId?: string,
 ) {
     const formData = new FormData();
-    formData.append("subjectId", subjectId);
     formData.append("file", file);
-    if (caption) {
-        formData.append("caption", caption);
-    }
-    if (clientUploadId) {
-        formData.append("clientUploadId", clientUploadId);
-    }
 
-    const response = await fetch(`${apiUrl}/api/media/upload`, {
+    const params = new URLSearchParams();
+    params.append("subjectId", subjectId);
+    if (caption) params.append("caption", caption);
+    if (clientUploadId) params.append("clientUploadId", clientUploadId);
+
+    const response = await fetch(`${getApiUrl()}/api/media/upload?${params.toString()}`, {
         method: "POST",
         credentials: "include",
         body: formData,
@@ -184,7 +201,9 @@ export async function uploadMedia(
         throw new Error(data?.message ?? "Không thể upload file.");
     }
 
-    return data as MediaItem;
+    const item = data as MediaItem;
+    item.url = ensureAbsoluteUrl(item.url);
+    return item;
 }
 
 export async function deleteMedia(mediaId: string) {
@@ -200,7 +219,7 @@ export async function retryProcessing(mediaId: string) {
 }
 
 export async function logout() {
-    await fetch(`${apiUrl}/api/auth/logout`, {
+    await fetch(`${getApiUrl()}/api/auth/logout`, {
         method: "POST",
         credentials: "include",
     });
@@ -213,7 +232,7 @@ async function request<T>(
         body?: Record<string, unknown>;
     },
 ): Promise<T> {
-    const response = await fetch(`${apiUrl}${path}`, {
+    const response = await fetch(`${getApiUrl()}${path}`, {
         method: options.method,
         headers: options.body ? { "Content-Type": "application/json" } : undefined,
         credentials: "include",

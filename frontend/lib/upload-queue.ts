@@ -9,7 +9,7 @@
  */
 
 const DB_NAME = "givemepic-upload-queue";
-const DB_VERSION = 1;
+const DB_VERSION = 3; // Bump to clear old Blob schema
 const STORE_NAME = "uploads";
 
 export type UploadStatus = "pending" | "uploading" | "done" | "failed";
@@ -19,7 +19,7 @@ export interface QueuedUpload {
     subjectId: string;
     caption: string | null;
     fileName: string;
-    fileDataUrl: string; // base64 data-URL — persists across close/refresh
+    fileBuffer: ArrayBuffer; // Store raw bytes to prevent iOS deleting temp camera files
     fileType: string;
     fileSizeBytes: number;
     status: UploadStatus;
@@ -41,9 +41,10 @@ function openDb(): Promise<IDBDatabase> {
 
         request.onupgradeneeded = (event) => {
             const db = (event.target as IDBOpenDBRequest).result;
-            if (!db.objectStoreNames.contains(STORE_NAME)) {
-                db.createObjectStore(STORE_NAME, { keyPath: "clientUploadId" });
+            if (db.objectStoreNames.contains(STORE_NAME)) {
+                db.deleteObjectStore(STORE_NAME); // Clear old v1 schema
             }
+            db.createObjectStore(STORE_NAME, { keyPath: "clientUploadId" });
         };
 
         request.onsuccess = (event) => resolve((event.target as IDBOpenDBRequest).result);
@@ -145,23 +146,4 @@ export async function removeFromQueue(clientUploadId: string): Promise<void> {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Convert a File to a base64 data-URL so it can be stored in IndexedDB. */
-export function fileToDataUrl(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = () => reject(reader.error);
-        reader.readAsDataURL(file);
-    });
-}
-
-/** Recreate a File from a base64 data-URL (for passing to the upload API). */
-export function dataUrlToFile(dataUrl: string, fileName: string, fileType: string): File {
-    const [, base64] = dataUrl.split(",");
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-        bytes[i] = binary.charCodeAt(i);
-    }
-    return new File([bytes], fileName, { type: fileType });
-}
+// Removed base64 string conversion helpers to save memory

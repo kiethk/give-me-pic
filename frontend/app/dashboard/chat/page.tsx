@@ -1,6 +1,11 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css";
 import {
     askChat,
     ChatCitation,
@@ -168,9 +173,9 @@ export default function ChatPage() {
     }
 
     return (
-        <div className="flex h-full">
-            {/* ── Sessions sidebar ── */}
-            <aside className="flex w-64 shrink-0 flex-col border-r border-[#e2e8f0] bg-white">
+        <div className="flex h-full flex-col md:flex-row">
+            {/* ── Sessions sidebar (Desktop) ── */}
+            <aside className="hidden md:flex w-64 shrink-0 flex-col border-r border-[#e2e8f0] bg-white">
                 <div className="border-b border-[#e2e8f0] px-4 py-4">
                     <button
                         onClick={startNewChat}
@@ -229,16 +234,39 @@ export default function ChatPage() {
             </aside>
 
             {/* ── Chat area ── */}
-            <div className="flex flex-1 flex-col overflow-hidden">
+            <div className="flex flex-1 flex-col overflow-hidden relative">
+                {/* Mobile controls (Subject filter + New Chat) */}
+                <div className="md:hidden flex items-center justify-between border-b border-[#e2e8f0] bg-[#f9f9ff] px-4 py-2 shrink-0">
+                    <select
+                        value={subjectFilter}
+                        onChange={(e) => setSubjectFilter(e.target.value)}
+                        className="h-8 w-40 rounded-md border border-[#c2c6d8] bg-white px-2 text-xs text-[#111c2d] outline-none"
+                    >
+                        <option value="">All subjects</option>
+                        {subjects.map((s) => (
+                            <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                    </select>
+                    <button
+                        onClick={startNewChat}
+                        className="flex h-8 items-center gap-1.5 rounded-md bg-[#0050cb] px-3 text-xs font-semibold text-white"
+                    >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                        </svg>
+                        New chat
+                    </button>
+                </div>
+
                 {/* Error banner */}
                 {error && (
-                    <div className="mx-6 mt-4 rounded-xl border border-[#ffdad6] bg-[#fff5f5] px-4 py-3 text-sm text-[#93000a]">
+                    <div className="mx-4 md:mx-6 mt-4 rounded-xl border border-[#ffdad6] bg-[#fff5f5] px-4 py-3 text-sm text-[#93000a]">
                         {error}
                     </div>
                 )}
 
                 {/* Messages */}
-                <div className="flex-1 overflow-y-auto px-6 py-6">
+                <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4 md:py-6">
                     {isLoadingHistory ? (
                         <div className="flex h-full items-center justify-center">
                             <p className="text-sm text-[#727687]">Loading conversation…</p>
@@ -290,7 +318,14 @@ export default function ChatPage() {
                                                     )}
                                                 </div>
                                             ) : (
-                                                <p className="whitespace-pre-wrap leading-relaxed">{displayContent}</p>
+                                                <div className="prose prose-sm max-w-none text-current marker:text-current prose-p:leading-relaxed prose-pre:bg-[#f0f3ff] prose-pre:text-[#111c2d] prose-a:text-current prose-strong:text-current prose-headings:text-current prose-code:text-current">
+                                                    <ReactMarkdown
+                                                        remarkPlugins={[remarkGfm, remarkMath]}
+                                                        rehypePlugins={[rehypeKatex]}
+                                                    >
+                                                        {displayContent}
+                                                    </ReactMarkdown>
+                                                </div>
                                             )}
 
                                             {!isError && message.role === "assistant" && message.citations.length > 0 && (
@@ -327,7 +362,7 @@ export default function ChatPage() {
                 </div>
 
                 {/* Input bar */}
-                <form onSubmit={handleSend} className="border-t border-[#e2e8f0] bg-white px-6 py-4">
+                <form onSubmit={handleSend} className="shrink-0 border-t border-[#e2e8f0] bg-white px-4 md:px-6 py-3 md:py-4">
                     <div className="flex items-center gap-3 rounded-xl border border-[#c2c6d8] bg-[#f9f9ff] px-4 py-2 transition-colors focus-within:border-[#0050cb] focus-within:ring-2 focus-within:ring-[#0050cb]/15">
                         <input
                             value={question}

@@ -66,9 +66,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
 
     return (
-        <div className="flex h-full bg-[#f0f3ff]">
-            {/* ── Sidebar ── */}
-            <aside className="flex w-[220px] shrink-0 flex-col border-r border-[#e2e8f0] bg-white">
+        <div className="flex h-full bg-[#f0f3ff] md:flex-row flex-col">
+            {/* ── Sidebar (Desktop Only) ── */}
+            <aside className="hidden md:flex w-[220px] shrink-0 flex-col border-r border-[#e2e8f0] bg-white">
                 {/* Logo */}
                 <div className="flex h-16 items-center gap-2.5 border-b border-[#e2e8f0] px-5">
                     <img src="/icons/icon-192x192.png" alt="Give Me Pic logo" className="h-8 w-8 rounded-lg object-cover" />
@@ -124,9 +124,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </aside>
 
             {/* ── Main content ── */}
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                {/* Top bar */}
-                <header className="flex h-16 shrink-0 items-center justify-between border-b border-[#e2e8f0] bg-white px-8">
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden relative">
+                {/* Desktop Top bar */}
+                <header className="hidden md:flex h-16 shrink-0 items-center justify-between border-b border-[#e2e8f0] bg-white px-8">
                     <div className="flex h-9 w-72 items-center gap-2.5 rounded-lg border border-[#e2e8f0] bg-[#f9f9ff] px-3">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#727687" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -145,10 +145,43 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     </div>
                 </header>
 
+                {/* Mobile Top bar */}
+                <header className="flex md:hidden h-14 shrink-0 items-center justify-between border-b border-[#e2e8f0] bg-white px-4">
+                    <div className="flex items-center gap-2">
+                        <img src="/icons/icon-192x192.png" alt="Logo" className="h-7 w-7 rounded-md object-cover" />
+                        <span className="text-[15px] font-bold text-[#111c2d] tracking-tight">Give Me Pic</span>
+                    </div>
+                    <button onClick={handleLogout} className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0050cb] text-[11px] font-semibold text-white">
+                        {profile?.displayName?.[0]?.toUpperCase() ?? "U"}
+                    </button>
+                </header>
+
                 {/* Page content */}
                 <main className="flex-1 overflow-y-auto">
                     {children}
                 </main>
+
+                {/* Mobile Bottom Navigation */}
+                <nav className="md:hidden shrink-0 h-[72px] bg-white border-t border-[#e2e8f0] flex items-center justify-around px-2 pb-[env(safe-area-inset-bottom)] z-50">
+                    <Link href="/dashboard" className="flex flex-col items-center gap-1 p-2 text-[#727687] min-w-[64px]">
+                        <IconGrid active={isActive('/dashboard')} />
+                        <span className={`text-[10px] font-medium ${isActive('/dashboard') ? 'text-[#0050cb]' : ''}`}>Subjects</span>
+                    </Link>
+
+                    {/* Camera FAB */}
+                    <div className="relative -top-5">
+                        <Link href="/dashboard/upload" className="flex h-14 w-14 items-center justify-center rounded-full bg-[#0050cb] shadow-[0_8px_16px_rgba(0,80,203,0.3)] text-white hover:bg-[#0066ff] transition-transform active:scale-95">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
+                            </svg>
+                        </Link>
+                    </div>
+
+                    <Link href="/dashboard/chat" className="flex flex-col items-center gap-1 p-2 text-[#727687] min-w-[64px]">
+                        <IconChat active={isActive('/dashboard/chat')} />
+                        <span className={`text-[10px] font-medium ${isActive('/dashboard/chat') ? 'text-[#0050cb]' : ''}`}>Ask AI</span>
+                    </Link>
+                </nav>
             </div>
         </div>
     );

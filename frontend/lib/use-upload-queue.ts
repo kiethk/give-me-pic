@@ -13,10 +13,20 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { uploadMedia } from "@/lib/api-client";
+
+function generateId() {
+    if (typeof crypto !== "undefined" && crypto.randomUUID) {
+        return crypto.randomUUID();
+    }
+    // Fallback for non-HTTPS (e.g. LAN) environments where crypto API is restricted
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
 import {
-    dataUrlToFile,
     enqueue,
-    fileToDataUrl,
     getAllUploads,
     getUploads,
     QueuedUpload,
@@ -38,7 +48,7 @@ interface UseUploadQueue {
      * Enqueue a file for upload. If online, starts uploading immediately.
      * If offline, stores in IndexedDB and uploads when the connection returns.
      */
-    addToQueue(subjectId: string, file: File, caption?: string): Promise<void>;
+    addToQueue(subjectId: string, file: File, buffer: ArrayBuffer, caption?: string): Promise<void>;
     /** Manual trigger — useful for a "Retry failed" button. */
     retryFailed(): void;
 }
@@ -94,18 +104,25 @@ export function useUploadQueue(onUploadSuccess?: () => void): UseUploadQueue {
                 await refreshQueue();
 
                 try {
-                    const file = dataUrlToFile(item.fileDataUrl, item.fileName, item.fileType);
+                    // Reconstruct a File from the ArrayBuffer stored in IndexedDB
+                    const file = new File([item.fileBuffer], item.fileName, { type: item.fileType });
+                    const apiUrl = process.env.NEXT_PUBLIC_API_URL
+                        ?? (typeof window !== "undefined"
+                            ? `${window.location.protocol}//${window.location.hostname}:8080`
+                            : "http://localhost:8080");
+                    const params = new URLSearchParams();
+                    params.append("subjectId", item.subjectId);
+                    if (item.caption) params.append("caption", item.caption);
+                    params.append("clientUploadId", item.clientUploadId);
+
                     const response = await fetch(
-                        `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"}/api/media/upload`,
+                        `${apiUrl}/api/media/upload?${params.toString()}`,
                         {
                             method: "POST",
                             credentials: "include",
                             body: (() => {
                                 const fd = new FormData();
-                                fd.append("subjectId", item.subjectId);
                                 fd.append("file", file);
-                                if (item.caption) fd.append("caption", item.caption);
-                                fd.append("clientUploadId", item.clientUploadId);
                                 return fd;
                             })(),
                         },
@@ -184,16 +201,15 @@ export function useUploadQueue(onUploadSuccess?: () => void): UseUploadQueue {
     // -----------------------------------------------------------------------
 
     const addToQueue = useCallback(
-        async (subjectId: string, file: File, caption?: string) => {
-            const clientUploadId = crypto.randomUUID();
-            const fileDataUrl = await fileToDataUrl(file);
+        async (subjectId: string, file: File, buffer: ArrayBuffer, caption?: string) => {
+            const clientUploadId = generateId();
 
             await enqueue({
                 clientUploadId,
                 subjectId,
                 caption: caption ?? null,
                 fileName: file.name,
-                fileDataUrl,
+                fileBuffer: buffer,
                 fileType: file.type,
                 fileSizeBytes: file.size,
             });
