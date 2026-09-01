@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -56,5 +57,14 @@ public class ChatController {
             @AuthenticationPrincipal UUID userId,
             @PathVariable UUID sessionId) {
         return ResponseEntity.ok(chatService.getSessionMessages(userId, sessionId));
+    }
+
+    @PatchMapping("/sessions/{sessionId}")
+    public ResponseEntity<Void> renameSession(
+            @AuthenticationPrincipal UUID userId,
+            @PathVariable UUID sessionId,
+            @RequestBody com.givemepic.backend.chat.dto.RenameSessionRequest request) {
+        chatService.renameSession(userId, sessionId, request.title());
+        return ResponseEntity.noContent().build();
     }
 }

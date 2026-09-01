@@ -95,11 +95,14 @@ export default function UploadPage() {
     const failed = queue.filter((u) => u.status === "failed");
 
     return (
-        <div className="mx-auto max-w-2xl px-8 py-8">
+        <div className="mx-auto max-w-2xl px-4 py-6 md:px-8 md:py-8">
             {/* Header */}
-            <h1 className="text-3xl font-bold tracking-tight text-[#111c2d]">Upload photos</h1>
-            <p className="mt-1 text-sm text-[#727687]">
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#111c2d]">Upload photos</h1>
+            <p className="hidden md:block mt-1 text-sm text-[#727687]">
                 Drag and drop lecture images, notes, or study documents — the system will process them automatically.
+            </p>
+            <p className="md:hidden mt-1 text-[13px] text-[#727687]">
+                Take photos or select images from your gallery.
             </p>
 
             {/* Offline banner */}
@@ -119,13 +122,14 @@ export default function UploadPage() {
             )}
 
             {/* Subject selector */}
-            <div className="mt-6">
+            <div className="mt-6 md:mt-8">
                 <label className="block text-sm font-medium text-[#424656]">Upload to subject</label>
-                <select
-                    value={selectedSubjectId}
-                    onChange={(e) => setSelectedSubjectId(e.target.value)}
-                    className="mt-1.5 h-10 w-full rounded-lg border border-[#c2c6d8] bg-white px-3 text-sm text-[#111c2d] outline-none transition focus:border-[#0050cb] focus:ring-2 focus:ring-[#0050cb]/15"
-                >
+                <div className="relative mt-2">
+                    <select
+                        value={selectedSubjectId}
+                        onChange={(e) => setSelectedSubjectId(e.target.value)}
+                        className="appearance-none h-12 md:h-10 w-full rounded-xl md:rounded-lg border border-[#c2c6d8] bg-white px-4 md:px-3 text-[15px] md:text-sm text-[#111c2d] outline-none transition focus:border-[#0050cb] focus:ring-2 focus:ring-[#0050cb]/15"
+                    >
                     {subjects.length === 0 ? (
                         <option value="">No subjects — create one first</option>
                     ) : (
@@ -133,7 +137,13 @@ export default function UploadPage() {
                             <option key={s.id} value={s.id}>{s.name}</option>
                         ))
                     )}
-                </select>
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-[#727687]">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                    </div>
+                </div>
             </div>
 
             {/* Caption */}
@@ -143,36 +153,46 @@ export default function UploadPage() {
                     value={caption}
                     onChange={(e) => setCaption(e.target.value)}
                     placeholder="e.g. Chapter 3 — Integration"
-                    className="mt-1.5 h-10 w-full rounded-lg border border-[#c2c6d8] bg-white px-3 text-sm outline-none transition focus:border-[#0050cb] focus:ring-2 focus:ring-[#0050cb]/15"
+                    className="mt-2 h-12 md:h-10 w-full rounded-xl md:rounded-lg border border-[#c2c6d8] bg-white px-4 md:px-3 text-[15px] md:text-sm outline-none transition focus:border-[#0050cb] focus:ring-2 focus:ring-[#0050cb]/15"
                 />
             </div>
 
             {/* Mobile Camera Capture */}
-            <div className="mt-6 md:mt-8">
+            <div className="mt-8 flex flex-col gap-3">
                 <button
                     onClick={() => cameraInputRef.current?.click()}
                     disabled={!selectedSubjectId}
-                    className="flex w-full h-14 items-center justify-center gap-2.5 rounded-xl bg-[#0050cb] text-base font-semibold text-white shadow-md hover:bg-[#0066ff] disabled:opacity-50 transition-all active:scale-[0.98]"
+                    className="flex w-full h-14 items-center justify-center gap-2.5 rounded-xl bg-[#0050cb] text-[15px] font-semibold text-white shadow-sm hover:bg-[#0066ff] disabled:opacity-50 transition-transform active:scale-[0.98]"
                 >
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>
                     </svg>
                     Take Photo
                 </button>
+                <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={!selectedSubjectId}
+                    className="md:hidden flex w-full h-14 items-center justify-center gap-2.5 rounded-xl bg-[#e7eeff] text-[15px] font-semibold text-[#0050cb] hover:bg-[#d6e2ff] disabled:opacity-50 transition-transform active:scale-[0.98]"
+                >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
+                    </svg>
+                    Choose from Gallery
+                </button>
             </div>
 
-            <div className="mt-4 flex items-center gap-4">
+            <div className="hidden md:flex mt-6 items-center gap-4">
                 <div className="h-px flex-1 bg-[#e2e8f0]"></div>
                 <span className="text-sm font-medium text-[#727687]">OR</span>
                 <div className="h-px flex-1 bg-[#e2e8f0]"></div>
             </div>
 
-            {/* Drop zone */}
+            {/* Drop zone (Desktop only) */}
             <div
                 onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                 onDragLeave={() => setIsDragging(false)}
                 onDrop={handleDrop}
-                className={`mt-4 flex flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed p-8 md:p-12 text-center transition-colors ${
+                className={`hidden md:flex mt-4 flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed p-12 text-center transition-colors ${
                     isDragging
                         ? "border-[#0050cb] bg-[#e7eeff]"
                         : "border-[#c2c6d8] bg-white hover:border-[#0050cb] hover:bg-[#f0f3ff]"

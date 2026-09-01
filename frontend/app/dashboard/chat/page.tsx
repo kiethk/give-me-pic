@@ -15,7 +15,9 @@ import {
     getChatSessions,
     getSubjects,
     Subject,
+    renameChatSession,
 } from "@/lib/api-client";
+import { BottomSheet } from "@/components/BottomSheet";
 
 export default function ChatPage() {
     const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -28,6 +30,13 @@ export default function ChatPage() {
     const [isSending, setIsSending] = useState(false);
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
     const [previewCitation, setPreviewCitation] = useState<ChatCitation | null>(null);
+    const [showHistorySheet, setShowHistorySheet] = useState(false);
+    
+    // Rename state
+    const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+    const [editingTitle, setEditingTitle] = useState("");
+    const [isRenaming, setIsRenaming] = useState(false);
+
     // Stores the last failed send payload so it can be retried inline
     const [failedPayload, setFailedPayload] = useState<{ question: string; sessionId: string | null; subjectId: string | null } | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -153,6 +162,21 @@ export default function ChatPage() {
         Promise.all([getChatSessions().then(setSessions), getSubjects().then(setSubjects)]);
     }, []);
 
+    async function handleRenameSubmit(e: React.FormEvent, sessionId: string) {
+        e.preventDefault();
+        const trimmed = editingTitle.trim();
+        setIsRenaming(true);
+        try {
+            await renameChatSession(sessionId, trimmed);
+            await loadSessions();
+            setEditingSessionId(null);
+        } catch (err) {
+            alert(err instanceof Error ? err.message : "Cannot rename session");
+        } finally {
+            setIsRenaming(false);
+        }
+    }
+
     useEffect(() => {
         if (currentSessionId) {
             // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -171,7 +195,6 @@ export default function ChatPage() {
             </div>
         );
     }
-
     return (
         <div className="flex h-full flex-col md:flex-row">
             {/* ── Sessions sidebar (Desktop) ── */}
@@ -213,20 +236,48 @@ export default function ChatPage() {
                             <p className="px-2 py-2 text-sm text-[#727687]">No conversations yet.</p>
                         ) : (
                             sessions.map((session) => (
-                                <button
-                                    key={session.sessionId}
-                                    onClick={() => setCurrentSessionId(session.sessionId)}
-                                    className={`flex w-full items-center rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
-                                        currentSessionId === session.sessionId
-                                            ? "bg-[#e7eeff] font-medium text-[#0050cb]"
-                                            : "text-[#424656] hover:bg-[#f0f3ff]"
-                                    }`}
-                                >
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mr-2 shrink-0 opacity-60">
-                                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                                    </svg>
-                                    <span className="truncate">{session.title || "New conversation"}</span>
-                                </button>
+                                <div key={session.sessionId} className="group relative flex items-center">
+                                    {editingSessionId === session.sessionId ? (
+                                        <form onSubmit={(e) => handleRenameSubmit(e, session.sessionId)} className="flex w-full items-center gap-2 px-2 py-1">
+                                            <input
+                                                autoFocus
+                                                value={editingTitle}
+                                                onChange={(e) => setEditingTitle(e.target.value)}
+                                                className="h-8 flex-1 rounded-md border border-[#0050cb] px-2 text-sm outline-none"
+                                                disabled={isRenaming}
+                                                onBlur={() => setEditingSessionId(null)}
+                                            />
+                                        </form>
+                                    ) : (
+                                        <>
+                                            <button
+                                                onClick={() => setCurrentSessionId(session.sessionId)}
+                                                className={`flex flex-1 items-center rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
+                                                    currentSessionId === session.sessionId
+                                                        ? "bg-[#e7eeff] font-medium text-[#0050cb]"
+                                                        : "text-[#424656] hover:bg-[#f0f3ff]"
+                                                }`}
+                                            >
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mr-2 shrink-0 opacity-60">
+                                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                                                </svg>
+                                                <span className="truncate pr-6">{session.title || "New conversation"}</span>
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    setEditingSessionId(session.sessionId);
+                                                    setEditingTitle(session.title || "");
+                                                }}
+                                                className="absolute right-2 opacity-0 group-hover:opacity-100 p-1.5 text-[#727687] hover:text-[#0050cb] transition-opacity bg-white rounded-md shadow-sm border border-[#e2e8f0]"
+                                                title="Rename"
+                                            >
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                                </svg>
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
                             ))
                         )}
                     </div>
@@ -235,26 +286,37 @@ export default function ChatPage() {
 
             {/* ── Chat area ── */}
             <div className="flex flex-1 flex-col overflow-hidden relative">
-                {/* Mobile controls (Subject filter + New Chat) */}
+                {/* Mobile controls (Subject filter + New Chat + History) */}
                 <div className="md:hidden flex items-center justify-between border-b border-[#e2e8f0] bg-[#f9f9ff] px-4 py-2 shrink-0">
+                    <button
+                        onClick={() => setShowHistorySheet(true)}
+                        className="flex h-8 w-8 items-center justify-center rounded-md text-[#424656]"
+                        aria-label="History"
+                    >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>
+                        </svg>
+                    </button>
+
                     <select
                         value={subjectFilter}
                         onChange={(e) => setSubjectFilter(e.target.value)}
-                        className="h-8 w-40 rounded-md border border-[#c2c6d8] bg-white px-2 text-xs text-[#111c2d] outline-none"
+                        className="h-8 w-32 rounded-md border border-[#c2c6d8] bg-white px-2 text-xs text-[#111c2d] outline-none"
                     >
                         <option value="">All subjects</option>
                         {subjects.map((s) => (
                             <option key={s.id} value={s.id}>{s.name}</option>
                         ))}
                     </select>
+
                     <button
                         onClick={startNewChat}
-                        className="flex h-8 items-center gap-1.5 rounded-md bg-[#0050cb] px-3 text-xs font-semibold text-white"
+                        className="flex h-8 items-center gap-1.5 rounded-md bg-[#0050cb] px-3 text-xs font-semibold text-white active:scale-95 transition-transform"
                     >
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                         </svg>
-                        New chat
+                        New
                     </button>
                 </div>
 

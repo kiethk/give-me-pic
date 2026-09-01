@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getProfile, logout, UserProfile } from "@/lib/api-client";
+import { BottomSheet } from "@/components/BottomSheet";
 
 // ── Icons (inline SVG, no extra dependency) ──────────────────────────────────
 function IconGrid({ active }: { active: boolean }) {
@@ -47,6 +48,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const pathname = usePathname();
     const router = useRouter();
     const [profile, setProfile] = useState<UserProfile | null>(null);
+    const [showProfileSheet, setShowProfileSheet] = useState(false);
 
     useEffect(() => {
         getProfile()
@@ -151,10 +153,53 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         <img src="/icons/icon-192x192.png" alt="Logo" className="h-7 w-7 rounded-md object-cover" />
                         <span className="text-[15px] font-bold text-[#111c2d] tracking-tight">Give Me Pic</span>
                     </div>
-                    <button onClick={handleLogout} className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0050cb] text-[11px] font-semibold text-white">
+                    <button onClick={() => setShowProfileSheet(true)} className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0050cb] text-[11px] font-semibold text-white">
                         {profile?.displayName?.[0]?.toUpperCase() ?? "U"}
                     </button>
                 </header>
+
+                {/* Mobile Profile Sheet */}
+                <BottomSheet
+                    open={showProfileSheet}
+                    onClose={() => setShowProfileSheet(false)}
+                    title="Account"
+                >
+                    <div className="px-5 py-4">
+                        <div className="flex flex-col items-center gap-3 border-b border-[#f0f3ff] pb-5">
+                            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#0050cb] text-2xl font-semibold text-white">
+                                {profile?.displayName?.[0]?.toUpperCase() ?? "U"}
+                            </div>
+                            <div className="text-center">
+                                <p className="text-lg font-bold text-[#111c2d]">{profile?.displayName ?? "…"}</p>
+                                <p className="text-sm text-[#727687]">{profile?.email ?? "…"}</p>
+                            </div>
+                        </div>
+                        <div className="mt-2 space-y-1">
+                            <button
+                                onClick={() => {
+                                    setShowProfileSheet(false);
+                                    router.push("/dashboard/settings");
+                                }}
+                                className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-[#111c2d] hover:bg-[#f0f3ff] transition-colors"
+                            >
+                                <IconSettings active={false} />
+                                Profile Settings
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setShowProfileSheet(false);
+                                    handleLogout();
+                                }}
+                                className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-[#ba1a1a] hover:bg-[#ffdad6] transition-colors"
+                            >
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
+                                </svg>
+                                Sign out
+                            </button>
+                        </div>
+                    </div>
+                </BottomSheet>
 
                 {/* Page content */}
                 <main className="flex-1 overflow-y-auto">

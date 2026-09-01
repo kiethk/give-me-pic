@@ -195,4 +195,27 @@ public class ChatService {
                 storageService.createDownloadUrl(rs.getString("storage_path")),
                 rs.getDouble("similarity_score")), messageId);
     }
+
+    /**
+     * Renames a chat session title. Validates that the session belongs to the requesting user.
+     *
+     * @param userId    the authenticated user
+     * @param sessionId the session to rename
+     * @param newTitle  new title (blank → stored as null to reset to auto-title)
+     */
+    @Transactional
+    public void renameSession(UUID userId, UUID sessionId, String newTitle) {
+        String ownerCheckSql = "SELECT COUNT(*) FROM chat_sessions WHERE id = ? AND user_id = ?";
+        Integer count = jdbcTemplate.queryForObject(ownerCheckSql, Integer.class, sessionId, userId);
+        if (count == null || count == 0) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.NOT_FOUND,
+                    "Session không tồn tại hoặc không thuộc về user này");
+        }
+
+        String trimmed = (newTitle == null || newTitle.isBlank()) ? null : newTitle.trim();
+        jdbcTemplate.update(
+                "UPDATE chat_sessions SET title = ?, updated_at = NOW() WHERE id = ?",
+                trimmed, sessionId);
+    }
 }

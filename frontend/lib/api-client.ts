@@ -112,6 +112,13 @@ export async function getChatSessionMessages(sessionId: string) {
     });
 }
 
+export async function renameChatSession(sessionId: string, title: string) {
+    return request<void>(`/api/chat/sessions/${sessionId}`, {
+        method: "PATCH",
+        body: { title },
+    });
+}
+
 export async function register(payload: Required<AuthPayload>) {
     return request<AuthResponse>("/api/auth/register", {
         method: "POST",
@@ -228,7 +235,8 @@ export async function logout() {
 async function request<T>(
     path: string,
     options: {
-        method: "GET" | "POST" | "PUT" | "DELETE";
+        method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
+
         body?: Record<string, unknown>;
     },
 ): Promise<T> {
