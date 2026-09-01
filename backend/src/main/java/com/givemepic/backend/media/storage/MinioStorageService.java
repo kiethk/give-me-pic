@@ -20,10 +20,13 @@ public class MinioStorageService implements ObjectStorageService {
     private final MinioClient minioClient;
     private final String bucket;
     private final int presignedUrlExpirySeconds;
+    private final String internalEndpoint;   // e.g. http://localhost:9000
+    private final String publicEndpoint;     // e.g. http://192.168.1.23:9000 (optional)
     private volatile boolean bucketReady;
 
     public MinioStorageService(
             @Value("${app.storage.endpoint}") String endpoint,
+            @Value("${app.storage.public-endpoint:}") String publicEndpoint,
             @Value("${app.storage.access-key}") String accessKey,
             @Value("${app.storage.secret-key}") String secretKey,
             @Value("${app.storage.bucket}") String bucket,
@@ -34,6 +37,10 @@ public class MinioStorageService implements ObjectStorageService {
                 .build();
         this.bucket = bucket;
         this.presignedUrlExpirySeconds = presignedUrlExpirySeconds;
+        this.internalEndpoint = endpoint.replaceAll("/+$", "");
+        this.publicEndpoint = (publicEndpoint == null || publicEndpoint.isBlank())
+                ? null
+                : publicEndpoint.replaceAll("/+$", "");
     }
 
     @Override
@@ -79,12 +86,17 @@ public class MinioStorageService implements ObjectStorageService {
     @Override
     public String createDownloadUrl(String objectKey) {
         try {
-            return minioClient.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
+            String url = minioClient.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
                     .method(Method.GET)
                     .bucket(bucket)
                     .object(objectKey)
                     .expiry(presignedUrlExpirySeconds, TimeUnit.SECONDS)
                     .build());
+            // Rewrite internal endpoint to public endpoint so LAN/internet clients can access the URL.
+            if (publicEndpoint != null && url.startsWith(internalEndpoint)) {
+                url = publicEndpoint + url.substring(internalEndpoint.length());
+            }
+            return url;
         } catch (Exception ex) {
             throw new IllegalStateException("Không thể tạo download URL từ MinIO", ex);
         }

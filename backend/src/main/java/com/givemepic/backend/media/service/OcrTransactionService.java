@@ -52,9 +52,9 @@ public class OcrTransactionService {
             media.setOcrStatus("completed");
             media.setOcrError(null);
                     eventPublisher.publishEvent(new OcrCompletedEvent(mediaId, savedResult.getId()));
-        } catch (RuntimeException ex) {
+        } catch (Throwable ex) {
             media.setOcrStatus("failed");
-            media.setOcrError(ex.getMessage());
+            media.setOcrError(ex.getMessage() != null ? ex.getMessage() : ex.getClass().getSimpleName());
 
             OcrResult result = ocrResultRepository.findByMediaId(mediaId)
                     .orElseGet(() -> OcrResult.builder()

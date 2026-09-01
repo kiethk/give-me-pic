@@ -35,12 +35,26 @@ public class MediaService {
     @Value("${app.media.max-file-size-bytes:10485760}")
     private long maxFileSizeBytes;
 
+    @Value("${app.base-url:http://localhost:8080}")
+    private String baseUrl;
+
+    /** Returns the backend proxy URL for an image. Accessible from any LAN client via port 8080. */
+    private String imageProxyUrl(java.util.UUID mediaId) {
+        return "/api/media/" + mediaId + "/image";
+    }
+
     @Transactional(readOnly = true)
     public List<MediaResponse> list(UUID userId) {
         return mediaRepository.findByUserIdOrderByCreatedAtDesc(userId)
                 .stream()
-                .map(media -> MediaResponse.from(media, objectStorageService.createDownloadUrl(media.getStoragePath())))
+                .map(media -> MediaResponse.from(media, imageProxyUrl(media.getId())))
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<Media> findByIdForUser(UUID userId, UUID mediaId) {
+        return mediaRepository.findById(mediaId)
+                .filter(m -> m.getUserId().equals(userId));
     }
 
     @Transactional(readOnly = true)
@@ -48,7 +62,7 @@ public class MediaService {
         validateSubjectOwnership(userId, subjectId);
         return mediaRepository.findByUserIdAndSubjectIdOrderByCreatedAtDesc(userId, subjectId)
                 .stream()
-                .map(media -> MediaResponse.from(media, objectStorageService.createDownloadUrl(media.getStoragePath())))
+                .map(media -> MediaResponse.from(media, imageProxyUrl(media.getId())))
                 .toList();
     }
 
@@ -92,7 +106,7 @@ public class MediaService {
                     .build();
             Media savedMedia = mediaRepository.save(media);
             eventPublisher.publishEvent(new MediaUploadedEvent(savedMedia.getId()));
-            return MediaResponse.from(savedMedia, objectStorageService.createDownloadUrl(objectKey));
+            return MediaResponse.from(savedMedia, imageProxyUrl(savedMedia.getId()));
         } catch (org.springframework.dao.DataIntegrityViolationException ex) {
             if (clientUploadId != null) {
                 Optional<Media> existing = mediaRepository.findByUserIdAndClientUploadId(userId, clientUploadId);

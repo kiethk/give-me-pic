@@ -2,8 +2,11 @@ package com.givemepic.backend.media.controller;
 
 import com.givemepic.backend.media.dto.MediaResponse;
 import com.givemepic.backend.media.service.MediaService;
+import com.givemepic.backend.media.storage.ObjectStorageService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -25,6 +28,7 @@ import java.util.UUID;
 public class MediaController {
 
     private final MediaService mediaService;
+    private final ObjectStorageService objectStorageService;
 
     @GetMapping
     public ResponseEntity<List<MediaResponse>> list(
@@ -45,6 +49,26 @@ public class MediaController {
             @RequestPart("file") MultipartFile file) {
         MediaResponse response = mediaService.upload(userId, subjectId, caption, clientUploadId, file);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /**
+     * Proxy endpoint: downloads the image from MinIO internally and returns it
+     * to the client through port 8080 (no need for the client to reach MinIO :9000).
+     */
+    @GetMapping("/{id}/image")
+    public ResponseEntity<byte[]> image(
+            @AuthenticationPrincipal UUID userId,
+            @PathVariable UUID id) {
+        return mediaService.findByIdForUser(userId, id)
+                .map(media -> {
+                    byte[] data = objectStorageService.download(media.getStoragePath());
+                    String ct = media.getContentType() != null ? media.getContentType() : "image/jpeg";
+                    return ResponseEntity.ok()
+                            .header(HttpHeaders.CACHE_CONTROL, "public, max-age=3600")
+                            .contentType(MediaType.parseMediaType(ct))
+                            .body(data);
+                })
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/{id}")
