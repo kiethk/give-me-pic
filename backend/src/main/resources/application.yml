@@ -2,7 +2,7 @@ server:
   port: 8080
 
 app:
-  frontend-origin: ${FRONTEND_ORIGIN:http://localhost:3000,http://192.168.1.82:3000}
+  frontend-origin: ${FRONTEND_ORIGIN:http://localhost:3000,http://192.168.1.92:3000}
   cookie-secure: ${COOKIE_SECURE:false}
   base-url: ${APP_BASE_URL:http://localhost:8080}
   storage:

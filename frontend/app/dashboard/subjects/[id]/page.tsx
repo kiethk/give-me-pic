@@ -10,6 +10,7 @@ import {
     retryProcessing,
     Subject,
 } from "@/lib/api-client";
+import { BottomSheet } from "@/components/BottomSheet";
 
 type StatusFilter = "all" | "pending" | "processing" | "completed" | "failed";
 
@@ -37,6 +38,7 @@ export default function SubjectDetailPage() {
     const [isRetrying, setIsRetrying] = useState<Record<string, boolean>>({});
     const [isDeleting, setIsDeleting] = useState<Record<string, boolean>>({});
     const [previewMedia, setPreviewMedia] = useState<MediaItem | null>(null);
+    const [actionMedia, setActionMedia] = useState<MediaItem | null>(null);
 
     async function load() {
         try {
@@ -97,64 +99,54 @@ export default function SubjectDetailPage() {
     const filtered = filter === "all" ? media : media.filter((m) => getOverallStatus(m) === filter);
 
     return (
-        <div className="px-8 py-8">
-            {/* Back */}
-            <button
-                onClick={() => router.push("/dashboard")}
-                className="flex items-center gap-1.5 text-sm text-[#727687] hover:text-[#0050cb] transition-colors"
-            >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="15 18 9 12 15 6"/>
-                </svg>
-                Back to subjects
-            </button>
+        <div className="flex h-full flex-col bg-[#f0f3ff] md:bg-white relative">
+            {/* Native-feel Top App Bar */}
+            <div className="sticky top-0 z-30 flex items-center justify-between border-b border-[#e2e8f0] bg-white px-4 py-3 md:px-8 md:py-5 shadow-sm md:shadow-none">
+                <button
+                    onClick={() => router.push("/dashboard")}
+                    className="flex h-10 w-10 items-center justify-center -ml-2 rounded-full text-[#424656] active:bg-[#f0f3ff] transition-colors"
+                >
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="15 18 9 12 15 6"/>
+                    </svg>
+                </button>
 
-            {/* Header */}
-            <div className="mt-4 flex items-start justify-between">
-                <div>
-                    {subject && (
-                        <div className="flex items-center gap-2.5">
-                            <div
-                                className="flex h-8 w-8 items-center justify-center rounded-lg text-sm font-bold text-white"
-                                style={{ backgroundColor: subject.colorHex }}
-                            >
-                                {subject.name[0]?.toUpperCase()}
-                            </div>
-                            <div>
-                                <h1 className="text-2xl font-bold tracking-tight text-[#111c2d]">{subject.name}</h1>
-                                {subject.semester && (
-                                    <p className="mt-0.5 flex items-center gap-1 text-xs text-[#727687]">
-                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-                                        </svg>
-                                        Semester {subject.semester}
-                                    </p>
-                                )}
-                            </div>
-                        </div>
+                <div className="flex-1 text-center truncate px-2">
+                    {subject ? (
+                        <h1 className="text-lg md:text-2xl font-bold tracking-tight text-[#111c2d] truncate">
+                            {subject.name}
+                        </h1>
+                    ) : (
+                        <div className="h-6 w-32 mx-auto animate-pulse rounded bg-[#e2e8f0]"></div>
+                    )}
+                    {subject?.semester && (
+                        <p className="text-[11px] md:text-xs text-[#727687]">Semester {subject.semester}</p>
                     )}
                 </div>
+
                 <button
                     onClick={() => router.push("/dashboard/upload")}
-                    className="flex items-center gap-2 rounded-lg border border-[#c2c6d8] bg-white px-4 py-2 text-sm font-medium text-[#424656] hover:bg-[#f0f3ff] transition-colors"
+                    className="flex h-10 w-10 items-center justify-center -mr-2 rounded-full text-[#0050cb] active:bg-[#e7eeff] transition-colors"
+                    aria-label="Upload"
                 >
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/>
-                        <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                     </svg>
-                    Upload new
                 </button>
             </div>
 
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto px-4 py-4 md:px-8 md:py-6">
+
             {/* Status filter chips */}
             {!isLoading && media.length > 0 && (
-                <div className="mt-5 flex flex-wrap gap-2">
+                <div className="flex overflow-x-auto no-scrollbar gap-2 pb-2 -mx-4 px-4 md:mx-0 md:px-0">
                     <button
                         onClick={() => setFilter("all")}
-                        className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                        className={`shrink-0 flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-semibold transition-colors active:scale-95 ${
                             filter === "all"
-                                ? "bg-[#111c2d] text-white"
-                                : "bg-white border border-[#e2e8f0] text-[#424656] hover:bg-[#f0f3ff]"
+                                ? "bg-[#0050cb] text-white shadow-sm"
+                                : "bg-white border border-[#c2c6d8] text-[#424656] hover:bg-[#f0f3ff]"
                         }`}
                     >
                         All ({media.length})
@@ -166,13 +158,13 @@ export default function SubjectDetailPage() {
                             <button
                                 key={s}
                                 onClick={() => setFilter(s)}
-                                className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                                className={`shrink-0 flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-semibold transition-colors active:scale-95 ${
                                     filter === s
-                                        ? `${chip.bg} ${chip.text} ring-2 ring-current ring-offset-1`
-                                        : `bg-white border border-[#e2e8f0] ${chip.text} hover:${chip.bg}`
+                                        ? `${chip.bg} ${chip.text} ring-1 ring-current shadow-sm`
+                                        : `bg-white border border-[#c2c6d8] text-[#424656]`
                                 }`}
                             >
-                                <span className={`h-1.5 w-1.5 rounded-full ${chip.dot}`} />
+                                <span className={`h-2 w-2 rounded-full ${chip.dot}`} />
                                 {chip.label} ({counts[s]})
                             </button>
                         );
@@ -191,47 +183,58 @@ export default function SubjectDetailPage() {
 
             {/* Photo grid */}
             {!isLoading && filtered.length > 0 && (
-                <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                     {filtered.map((media) => {
                         const status = getOverallStatus(media);
                         const chip = STATUS_CHIPS[status];
                         return (
                             <div
                                 key={media.id}
-                                className="group relative overflow-hidden rounded-2xl border border-[#e2e8f0] bg-white shadow-sm"
+                                className="group relative overflow-hidden rounded-xl border border-[#e2e8f0] bg-white shadow-sm transition-all hover:shadow-md active:scale-[0.98]"
                             >
                                 {/* Image */}
                                 <button
-                                    className="block w-full"
+                                    className="block w-full outline-none"
                                     onClick={() => setPreviewMedia(media)}
                                 >
-                                    <div className="aspect-square overflow-hidden bg-[#e7eeff]">
+                                    <div className="aspect-square overflow-hidden bg-[#f0f3ff] relative">
                                         <img
                                             src={media.url}
                                             alt={media.caption || media.fileName}
-                                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                            className="h-full w-full object-cover transition-transform duration-300 md:group-hover:scale-105"
                                         />
+                                        <div className="absolute inset-0 bg-black/5 md:group-hover:bg-black/0 transition-colors" />
                                     </div>
                                 </button>
 
+                                {/* Top Actions (Mobile-first 3-dots) */}
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); setActionMedia(media); }}
+                                    className="absolute right-1.5 top-1.5 rounded-full bg-white/90 p-1.5 text-[#111c2d] shadow-sm backdrop-blur-md active:bg-white"
+                                >
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                                        <circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/>
+                                    </svg>
+                                </button>
+
                                 {/* Status chip overlay */}
-                                <div className={`absolute left-2 top-2 flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${chip.bg} ${chip.text}`}>
+                                <div className={`absolute left-2 top-2 flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold shadow-sm ${chip.bg} ${chip.text}`}>
                                     <span className={`h-1.5 w-1.5 rounded-full ${chip.dot} ${status === "processing" ? "animate-pulse" : ""}`} />
                                     {chip.label}
                                 </div>
 
                                 {/* Bottom bar */}
-                                <div className="p-2.5">
-                                    <p className="truncate text-xs font-medium text-[#111c2d]">{media.fileName}</p>
+                                <div className="p-3">
+                                    <p className="truncate text-[13px] font-semibold text-[#111c2d]">{media.fileName}</p>
                                     {media.caption && (
-                                        <p className="truncate text-[10px] text-[#727687]">{media.caption}</p>
+                                        <p className="truncate text-[11px] text-[#727687] mt-0.5">{media.caption}</p>
                                     )}
 
                                     {/* Error + retry */}
                                     {status === "failed" && (
-                                        <div className="mt-1.5 flex items-center gap-2">
+                                        <div className="mt-2 flex items-center gap-2">
                                             <p
-                                                className="flex-1 truncate text-[10px] text-[#ba1a1a]"
+                                                className="flex-1 truncate text-[10px] text-[#ba1a1a] font-medium"
                                                 title={media.ocrError || media.embeddingError || ""}
                                             >
                                                 {media.ocrError || media.embeddingError || "Processing failed"}
@@ -239,32 +242,12 @@ export default function SubjectDetailPage() {
                                             <button
                                                 onClick={() => handleRetry(media.id)}
                                                 disabled={isRetrying[media.id]}
-                                                className="shrink-0 rounded-md bg-[#0050cb] px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-[#0066ff] disabled:opacity-50 transition-colors"
+                                                className="shrink-0 rounded-md bg-[#0050cb] px-2.5 py-1 text-[11px] font-bold text-white active:scale-95 disabled:opacity-50 transition-transform"
                                             >
-                                                {isRetrying[media.id] ? "…" : "Retry"}
+                                                {isRetrying[media.id] ? "..." : "Retry"}
                                             </button>
                                         </div>
                                     )}
-                                </div>
-
-                                {/* Hover actions */}
-                                <div className="absolute inset-x-0 bottom-0 translate-y-full flex justify-center gap-1.5 bg-gradient-to-t from-black/60 to-transparent p-2 transition-transform duration-200 group-hover:translate-y-0">
-                                    <a
-                                        href={media.url}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="rounded-md bg-white/90 px-2.5 py-1 text-[11px] font-semibold text-[#111c2d] hover:bg-white transition-colors"
-                                        onClick={(e) => e.stopPropagation()}
-                                    >
-                                        Open
-                                    </a>
-                                    <button
-                                        onClick={() => handleDelete(media.id)}
-                                        disabled={isDeleting[media.id]}
-                                        className="rounded-md bg-[#ba1a1a]/90 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-[#ba1a1a] disabled:opacity-50 transition-colors"
-                                    >
-                                        {isDeleting[media.id] ? "…" : "Delete"}
-                                    </button>
                                 </div>
                             </div>
                         );
@@ -298,6 +281,8 @@ export default function SubjectDetailPage() {
                 </div>
             )}
 
+            </div>
+
             {/* Preview modal */}
             {previewMedia && (
                 <div
@@ -305,27 +290,78 @@ export default function SubjectDetailPage() {
                     onClick={() => setPreviewMedia(null)}
                 >
                     <div
-                        className="max-h-[90vh] max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl"
+                        className="max-h-[90vh] max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl flex flex-col"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="flex items-center justify-between border-b border-[#e2e8f0] px-5 py-3">
-                            <p className="text-sm font-semibold text-[#111c2d]">{previewMedia.fileName}</p>
-                            <button onClick={() => setPreviewMedia(null)} className="text-[#727687] hover:text-[#111c2d] transition-colors">
+                            <p className="text-sm font-semibold text-[#111c2d] truncate max-w-[200px] md:max-w-md">{previewMedia.fileName}</p>
+                            <button onClick={() => setPreviewMedia(null)} className="text-[#727687] hover:text-[#111c2d] transition-colors rounded-full p-1 hover:bg-[#f0f3ff]">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                                 </svg>
                             </button>
                         </div>
-                        <div className="flex max-h-[80vh] items-center justify-center overflow-auto bg-[#f0f3ff] p-4">
+                        <div className="flex flex-1 min-h-0 items-center justify-center overflow-auto bg-[#f0f3ff] p-4">
                             <img
                                 src={previewMedia.url}
                                 alt={previewMedia.fileName}
-                                className="max-h-[75vh] object-contain rounded-lg"
+                                className="max-h-[75vh] object-contain rounded-lg shadow-sm"
                             />
                         </div>
                     </div>
                 </div>
             )}
+
+            {/* Media Action Sheet */}
+            <BottomSheet
+                open={!!actionMedia}
+                onClose={() => setActionMedia(null)}
+                title="Photo Actions"
+            >
+                {actionMedia && (
+                    <div className="px-4 py-2 space-y-1">
+                        <button
+                            onClick={() => {
+                                setPreviewMedia(actionMedia);
+                                setActionMedia(null);
+                            }}
+                            className="flex w-full items-center gap-3 rounded-xl px-4 py-3.5 text-[15px] font-medium text-[#111c2d] hover:bg-[#f0f3ff] transition-colors"
+                        >
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#727687]">
+                                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>
+                            </svg>
+                            View fullscreen
+                        </button>
+                        
+                        <button
+                            onClick={() => {
+                                window.open(actionMedia.url, '_blank');
+                                setActionMedia(null);
+                            }}
+                            className="flex w-full items-center gap-3 rounded-xl px-4 py-3.5 text-[15px] font-medium text-[#111c2d] hover:bg-[#f0f3ff] transition-colors"
+                        >
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#727687]">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                            </svg>
+                            Download image
+                        </button>
+                        
+                        <button
+                            onClick={() => {
+                                handleDelete(actionMedia.id);
+                                setActionMedia(null);
+                            }}
+                            className="flex w-full items-center gap-3 rounded-xl px-4 py-3.5 text-[15px] font-medium text-[#ba1a1a] hover:bg-[#ffdad6] transition-colors"
+                        >
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
+                            </svg>
+                            Delete photo
+                        </button>
+                    </div>
+                )}
+            </BottomSheet>
+
         </div>
     );
 }

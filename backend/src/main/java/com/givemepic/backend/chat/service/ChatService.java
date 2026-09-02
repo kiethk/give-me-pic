@@ -76,7 +76,9 @@ public class ChatService {
     @Transactional
     public ChatMessageResponse answer(UUID userId, ChatRequest request) {
         UUID sessionId = request.sessionId();
+        boolean isNewSession = false;
         if (sessionId == null) {
+            isNewSession = true;
             sessionId = UUID.randomUUID();
             jdbcTemplate.update("""
                     INSERT INTO chat_sessions (id, user_id, subject_id, created_at, updated_at)
@@ -134,6 +136,23 @@ public class ChatService {
                         storageService.createDownloadUrl(c.storagePath()),
                         c.distance()))
                 .collect(Collectors.toList());
+
+        if (isNewSession) {
+            try {
+                String titlePrompt = "Tóm tắt ngắn gọn câu hỏi sau thành một tiêu đề (tối đa 5-6 chữ, chỉ trả lời tiêu đề, không có dấu ngoặc kép hay dấu câu ở cuối): " + request.question();
+                String generatedTitle = llmProvider.generateAnswer(titlePrompt).trim();
+                // Xoá ngoặc kép nếu LLM lỡ thêm vào
+                if (generatedTitle.startsWith("\"") && generatedTitle.endsWith("\"")) {
+                    generatedTitle = generatedTitle.substring(1, generatedTitle.length() - 1);
+                }
+                if (generatedTitle.length() > 50) {
+                    generatedTitle = generatedTitle.substring(0, 47) + "...";
+                }
+                jdbcTemplate.update("UPDATE chat_sessions SET title = ? WHERE id = ?", generatedTitle, sessionId);
+            } catch (Exception e) {
+                // Ignore title generation errors to not fail the chat response
+            }
+        }
 
         return new ChatMessageResponse(sessionId, assistantMessageId, answer, citations);
     }

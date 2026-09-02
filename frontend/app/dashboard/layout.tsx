@@ -101,9 +101,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {/* User profile */}
                 <div className="border-t border-[#e2e8f0] px-3 py-4">
                     <div className="flex items-center gap-3 rounded-lg px-2 py-2">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#0050cb] text-[13px] font-semibold text-white">
-                            {profile?.displayName?.[0]?.toUpperCase() ?? "U"}
-                        </div>
+                        {profile?.avatarUrl ? (
+                            <img src={profile.avatarUrl} alt="Avatar" className="h-8 w-8 shrink-0 rounded-full object-cover shadow-sm" />
+                        ) : (
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#0050cb] text-[13px] font-semibold text-white">
+                                {profile?.displayName?.[0]?.toUpperCase() ?? "U"}
+                            </div>
+                        )}
                         <div className="min-w-0 flex-1">
                             <p className="truncate text-[13px] font-semibold text-[#111c2d]">
                                 {profile?.displayName ?? "…"}
@@ -166,9 +170,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 >
                     <div className="px-5 py-4">
                         <div className="flex flex-col items-center gap-3 border-b border-[#f0f3ff] pb-5">
-                            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#0050cb] text-2xl font-semibold text-white">
-                                {profile?.displayName?.[0]?.toUpperCase() ?? "U"}
-                            </div>
+                            {profile?.avatarUrl ? (
+                                <img src={profile.avatarUrl} alt="Avatar" className="h-16 w-16 rounded-full object-cover shadow-sm" />
+                            ) : (
+                                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#0050cb] text-2xl font-semibold text-white">
+                                    {profile?.displayName?.[0]?.toUpperCase() ?? "U"}
+                                </div>
+                            )}
                             <div className="text-center">
                                 <p className="text-lg font-bold text-[#111c2d]">{profile?.displayName ?? "…"}</p>
                                 <p className="text-sm text-[#727687]">{profile?.email ?? "…"}</p>

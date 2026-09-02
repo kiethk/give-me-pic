@@ -3,6 +3,7 @@ package com.givemepic.backend.auth.controller;
 import com.givemepic.backend.auth.dto.AuthResponse;
 import com.givemepic.backend.auth.dto.LoginRequest;
 import com.givemepic.backend.auth.dto.RegisterRequest;
+import com.givemepic.backend.auth.dto.UpdateProfileRequest;
 import com.givemepic.backend.auth.dto.UserProfileResponse;
 import com.givemepic.backend.auth.service.AuthService;
 import jakarta.validation.Valid;
@@ -40,6 +41,13 @@ public class AuthController {
     @GetMapping("/me")
     public ResponseEntity<UserProfileResponse> me(@AuthenticationPrincipal UUID userId) {
         return ResponseEntity.ok(authService.getProfile(userId));
+    }
+
+    @PatchMapping("/me")
+    public ResponseEntity<UserProfileResponse> updateProfile(
+            @AuthenticationPrincipal UUID userId,
+            @Valid @RequestBody UpdateProfileRequest request) {
+        return ResponseEntity.ok(authService.updateProfile(userId, request));
     }
 
         @PostMapping("/logout")

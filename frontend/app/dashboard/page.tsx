@@ -6,9 +6,10 @@ import { useRouter } from "next/navigation";
 import {
     archiveSubject,
     createSubject,
-    CreateSubjectInput,
+    updateSubject,
     getSubjects,
     Subject,
+    CreateSubjectInput,
 } from "@/lib/api-client";
 
 // ── Subject colour options ────────────────────────────────────────────────────
@@ -42,19 +43,21 @@ function relativeTime(iso: string): string {
     return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
-// ── Create modal ──────────────────────────────────────────────────────────────
-function CreateSubjectModal({
+// ── Subject modal ──────────────────────────────────────────────────────────────
+function SubjectModal({
+    subjectToEdit,
     onClose,
-    onCreate,
+    onSuccess,
 }: {
+    subjectToEdit?: Subject | null;
     onClose: () => void;
-    onCreate: (subject: Subject) => void;
+    onSuccess: (subject: Subject, isEdit: boolean) => void;
 }) {
     const [form, setForm] = useState<CreateSubjectInput>({
-        name: "",
-        description: "",
-        colorHex: SUBJECT_COLORS[0],
-        semester: "",
+        name: subjectToEdit?.name || "",
+        description: subjectToEdit?.description || "",
+        colorHex: subjectToEdit?.colorHex || SUBJECT_COLORS[0],
+        semester: subjectToEdit?.semester || "",
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState("");
@@ -65,13 +68,22 @@ function CreateSubjectModal({
         setIsSubmitting(true);
         setError("");
         try {
-            const subject = await createSubject({
-                name: form.name.trim(),
-                description: form.description?.trim() || undefined,
-                colorHex: form.colorHex,
-                semester: form.semester?.trim() || undefined,
-            });
-            onCreate(subject);
+            let saved: Subject;
+            if (subjectToEdit) {
+                saved = await updateSubject(subjectToEdit.id, {
+                    name: form.name.trim(),
+                    description: form.description?.trim() || undefined,
+                });
+                saved = { ...subjectToEdit, ...saved };
+            } else {
+                saved = await createSubject({
+                    name: form.name.trim(),
+                    description: form.description?.trim() || undefined,
+                    colorHex: form.colorHex,
+                    semester: form.semester?.trim() || undefined,
+                });
+            }
+            onSuccess(saved, !!subjectToEdit);
             onClose();
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to create subject.");
@@ -81,7 +93,7 @@ function CreateSubjectModal({
     }
 
     return (
-        <BottomSheet open={true} onClose={onClose} title="New subject">
+        <BottomSheet open={true} onClose={onClose} title={subjectToEdit ? "Edit subject" : "New subject"}>
             <div className="px-5 py-2">
                 <p className="text-sm text-[#727687]">Organise your lecture photos by subject.</p>
 
@@ -143,7 +155,7 @@ function CreateSubjectModal({
                             disabled={isSubmitting || !form.name.trim()}
                             className="h-12 w-full rounded-xl bg-[#0050cb] text-[15px] font-semibold text-white hover:bg-[#0066ff] disabled:opacity-60 transition-colors active:scale-[0.98]"
                         >
-                            {isSubmitting ? "Creating…" : "Create subject"}
+                            {isSubmitting ? "Saving…" : (subjectToEdit ? "Save changes" : "Create subject")}
                         </button>
                     </div>
                 </form>
@@ -157,7 +169,8 @@ export default function SubjectsPage() {
     const router = useRouter();
     const [subjects, setSubjects] = useState<Subject[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [showCreate, setShowCreate] = useState(false);
+    const [showSubjectModal, setShowSubjectModal] = useState(false);
+    const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
     const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
     async function load() {
@@ -190,7 +203,7 @@ export default function SubjectsPage() {
                     <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#111c2d]">Subjects</h1>
                 </div>
                 <button
-                    onClick={() => setShowCreate(true)}
+                    onClick={() => { setEditingSubject(null); setShowSubjectModal(true); }}
                     className="flex h-10 w-10 md:h-auto md:w-auto items-center justify-center gap-2 rounded-full md:rounded-lg bg-[#0050cb] md:px-4 md:py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#0066ff] transition-transform active:scale-95"
                     aria-label="New subject"
                 >
@@ -237,6 +250,16 @@ export default function SubjectsPage() {
                                             className="flex w-full items-center gap-2 px-3 py-2 text-sm text-[#424656] hover:bg-[#f0f3ff]"
                                         >
                                             Open
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setEditingSubject(subject);
+                                                setShowSubjectModal(true);
+                                                setOpenMenuId(null);
+                                            }}
+                                            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-[#424656] hover:bg-[#f0f3ff]"
+                                        >
+                                            Edit
                                         </button>
                                         <button
                                             onClick={() => handleArchive(subject.id)}
@@ -292,7 +315,7 @@ export default function SubjectsPage() {
                     <h3 className="mt-4 text-lg font-semibold text-[#111c2d]">No subjects yet</h3>
                     <p className="mt-1 text-sm text-[#727687]">Create your first subject to start organising your notes.</p>
                     <button
-                        onClick={() => setShowCreate(true)}
+                        onClick={() => { setEditingSubject(null); setShowSubjectModal(true); }}
                         className="mt-5 rounded-lg bg-[#0050cb] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0066ff] transition-colors"
                     >
                         Create subject
@@ -305,11 +328,21 @@ export default function SubjectsPage() {
                 <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />
             )}
 
-            {/* Create modal */}
-            {showCreate && (
-                <CreateSubjectModal
-                    onClose={() => setShowCreate(false)}
-                    onCreate={(s) => setSubjects((prev) => [s, ...prev])}
+            {/* Subject Modal */}
+            {showSubjectModal && (
+                <SubjectModal
+                    subjectToEdit={editingSubject}
+                    onClose={() => {
+                        setShowSubjectModal(false);
+                        setEditingSubject(null);
+                    }}
+                    onSuccess={(subject, isEdit) => {
+                        if (isEdit) {
+                            setSubjects(prev => prev.map(s => s.id === subject.id ? subject : s));
+                        } else {
+                            setSubjects(prev => [subject, ...prev]);
+                        }
+                    }}
                 />
             )}
         </div>

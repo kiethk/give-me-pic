@@ -1,12 +1,5 @@
-function getApiUrl() {
-    if (process.env.NEXT_PUBLIC_API_URL) {
-        return process.env.NEXT_PUBLIC_API_URL;
-    }
-    if (typeof window !== "undefined") {
-        return `${window.location.protocol}//${window.location.hostname}:8080`;
-    }
-    return "http://localhost:8080";
-}
+// API calls use relative paths — Next.js rewrites proxy them to the backend.
+// This ensures the app works on any host (localhost, LAN IP, production domain).
 
 
 type AuthPayload = {
@@ -23,10 +16,12 @@ export type AuthResponse = {
     displayName: string;
 };
 
-export type UserProfile = {
+export interface UserProfile {
     userId: string;
     email: string;
     displayName: string;
+    avatarUrl?: string;
+    subscriptionTier: string;
 };
 
 export type Subject = {
@@ -134,7 +129,7 @@ export async function login(payload: Omit<AuthPayload, "displayName">) {
 }
 
 export async function getProfile() {
-    const response = await fetch(`${getApiUrl()}/api/auth/me`, {
+    const response = await fetch(`/api/auth/me`, {
         credentials: "include",
     });
     const data = await response.json().catch(() => null);
@@ -144,6 +139,13 @@ export async function getProfile() {
     }
 
     return data as UserProfile;
+}
+
+export async function updateProfile(payload: { displayName: string; avatarUrl?: string }) {
+    return request<UserProfile>("/api/auth/me", {
+        method: "PATCH",
+        body: payload,
+    });
 }
 
 export async function getSubjects() {
@@ -159,16 +161,28 @@ export async function createSubject(payload: CreateSubjectInput) {
     });
 }
 
+export async function updateSubject(id: string, payload: { name: string; description?: string }) {
+    return request<Subject>(`/api/subjects/${id}`, {
+        method: "PUT",
+        body: payload,
+    });
+}
+
 export async function archiveSubject(subjectId: string) {
     return request<void>(`/api/subjects/${subjectId}`, {
         method: "DELETE",
     });
 }
 
-// Helper to ensure media URLs are absolute based on the current environment
+// Media URLs from MinIO are already absolute (presigned URLs).
+// This is a passthrough — kept for safety in case relative URLs ever appear.
 function ensureAbsoluteUrl(url: string) {
     if (!url || url.startsWith("http")) return url;
-    return `${getApiUrl()}${url.startsWith("/") ? "" : "/"}${url}`;
+    // Fallback: make relative URL absolute using current window origin
+    if (typeof window !== "undefined") {
+        return `${window.location.origin}${url.startsWith("/") ? "" : "/"}${url}`;
+    }
+    return url;
 }
 
 export async function getMedia(subjectId?: string) {
@@ -196,7 +210,7 @@ export async function uploadMedia(
     if (caption) params.append("caption", caption);
     if (clientUploadId) params.append("clientUploadId", clientUploadId);
 
-    const response = await fetch(`${getApiUrl()}/api/media/upload?${params.toString()}`, {
+    const response = await fetch(`/api/media/upload?${params.toString()}`, {
         method: "POST",
         credentials: "include",
         body: formData,
@@ -226,7 +240,7 @@ export async function retryProcessing(mediaId: string) {
 }
 
 export async function logout() {
-    await fetch(`${getApiUrl()}/api/auth/logout`, {
+    await fetch(`/api/auth/logout`, {
         method: "POST",
         credentials: "include",
     });
@@ -240,7 +254,7 @@ async function request<T>(
         body?: Record<string, unknown>;
     },
 ): Promise<T> {
-    const response = await fetch(`${getApiUrl()}${path}`, {
+    const response = await fetch(`${path}`, {
         method: options.method,
         headers: options.body ? { "Content-Type": "application/json" } : undefined,
         credentials: "include",

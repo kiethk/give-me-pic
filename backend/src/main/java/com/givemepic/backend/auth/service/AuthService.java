@@ -3,6 +3,7 @@ package com.givemepic.backend.auth.service;
 import com.givemepic.backend.auth.dto.AuthResponse;
 import com.givemepic.backend.auth.dto.LoginRequest;
 import com.givemepic.backend.auth.dto.RegisterRequest;
+import com.givemepic.backend.auth.dto.UpdateProfileRequest;
 import com.givemepic.backend.auth.dto.UserProfileResponse;
 import com.givemepic.backend.auth.entity.RefreshToken;
 import com.givemepic.backend.auth.entity.User;
@@ -69,7 +70,19 @@ public class AuthService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy người dùng"));
 
-        return new UserProfileResponse(user.getId(), user.getEmail(), user.getDisplayName());
+        return new UserProfileResponse(user.getId(), user.getEmail(), user.getDisplayName(), user.getAvatarUrl(), user.getSubscriptionTier());
+    }
+
+    @Transactional
+    public UserProfileResponse updateProfile(UUID userId, UpdateProfileRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy người dùng"));
+
+        user.setDisplayName(request.displayName());
+        user.setAvatarUrl(request.avatarUrl());
+        userRepository.save(user);
+
+        return new UserProfileResponse(user.getId(), user.getEmail(), user.getDisplayName(), user.getAvatarUrl(), user.getSubscriptionTier());
     }
 
     private AuthResponse buildAuthResponse(User user) {

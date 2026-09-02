@@ -286,39 +286,74 @@ export default function ChatPage() {
 
             {/* ── Chat area ── */}
             <div className="flex flex-1 flex-col overflow-hidden relative">
-                {/* Mobile controls (Subject filter + New Chat + History) */}
-                <div className="md:hidden flex items-center justify-between border-b border-[#e2e8f0] bg-[#f9f9ff] px-4 py-2 shrink-0">
-                    <button
-                        onClick={() => setShowHistorySheet(true)}
-                        className="flex h-8 w-8 items-center justify-center rounded-md text-[#424656]"
-                        aria-label="History"
-                    >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>
-                        </svg>
-                    </button>
-
-                    <select
-                        value={subjectFilter}
-                        onChange={(e) => setSubjectFilter(e.target.value)}
-                        className="h-8 w-32 rounded-md border border-[#c2c6d8] bg-white px-2 text-xs text-[#111c2d] outline-none"
-                    >
-                        <option value="">All subjects</option>
-                        {subjects.map((s) => (
-                            <option key={s.id} value={s.id}>{s.name}</option>
-                        ))}
-                    </select>
-
-                    <button
-                        onClick={startNewChat}
-                        className="flex h-8 items-center gap-1.5 rounded-md bg-[#0050cb] px-3 text-xs font-semibold text-white active:scale-95 transition-transform"
-                    >
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-                        </svg>
-                        New
-                    </button>
+                {/* Desktop Chat Header */}
+                <div className="hidden md:flex shrink-0 items-center border-b border-[#e2e8f0] bg-white px-6 py-3">
+                    <h2 className="text-lg font-bold text-[#111c2d]">
+                        {currentSessionId
+                            ? sessions.find(s => s.sessionId === currentSessionId)?.title || "Chat"
+                            : "New conversation"}
+                    </h2>
                 </div>
+
+                {/* Mobile controls (Subject filter + New Chat + History) */}
+                <div className="md:hidden flex flex-col border-b border-[#e2e8f0] bg-white shrink-0">
+                    {/* Row 1: session title centered */}
+                    <div className="flex items-center gap-2 px-3 pt-2.5 pb-1">
+                        <button
+                            onClick={() => setShowHistorySheet(true)}
+                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#424656] active:bg-[#f0f3ff] transition-colors"
+                            aria-label="History"
+                        >
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>
+                            </svg>
+                        </button>
+
+                        <h2 className="flex-1 text-center text-[15px] font-semibold text-[#111c2d] truncate">
+                            {currentSessionId
+                                ? sessions.find(s => s.sessionId === currentSessionId)?.title || "Chat"
+                                : "New chat"}
+                        </h2>
+
+                        <button
+                            onClick={startNewChat}
+                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#0050cb] active:bg-[#e7eeff] transition-colors"
+                            aria-label="New chat"
+                        >
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                            </svg>
+                        </button>
+                    </div>
+
+                    {/* Row 2: subject filter as compact pill row */}
+                    <div className="flex gap-1.5 overflow-x-auto no-scrollbar px-3 pb-2.5 pt-0.5">
+                        <button
+                            onClick={() => setSubjectFilter("")}
+                            className={`shrink-0 h-7 rounded-full px-3 text-[11px] font-semibold transition-colors active:scale-95 ${
+                                subjectFilter === ""
+                                    ? "bg-[#0050cb] text-white"
+                                    : "bg-[#f0f3ff] text-[#424656]"
+                            }`}
+                        >
+                            All
+                        </button>
+                        {subjects.map((s) => (
+                            <button
+                                key={s.id}
+                                onClick={() => setSubjectFilter(s.id)}
+                                className={`shrink-0 h-7 rounded-full px-3 text-[11px] font-semibold transition-colors active:scale-95 ${
+                                    subjectFilter === s.id
+                                        ? "bg-[#0050cb] text-white"
+                                        : "bg-[#f0f3ff] text-[#424656]"
+                                }`}
+                            >
+                                {s.name}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
 
                 {/* Error banner */}
                 {error && (
@@ -480,6 +515,68 @@ export default function ChatPage() {
                     </div>
                 </div>
             )}
+            {/* Mobile History Sheet */}
+            <BottomSheet
+                open={showHistorySheet}
+                onClose={() => setShowHistorySheet(false)}
+                title="Chat History"
+            >
+                <div className="px-5 py-2">
+                    <div className="space-y-1 pb-4">
+                        {sessions.length === 0 ? (
+                            <p className="py-4 text-center text-sm text-[#727687]">No conversations yet.</p>
+                        ) : (
+                            sessions.map((session) => (
+                                <div key={session.sessionId} className="relative flex items-center">
+                                    {editingSessionId === session.sessionId ? (
+                                        <form onSubmit={(e) => handleRenameSubmit(e, session.sessionId)} className="flex w-full items-center gap-2 py-2">
+                                            <input
+                                                autoFocus
+                                                value={editingTitle}
+                                                onChange={(e) => setEditingTitle(e.target.value)}
+                                                className="h-10 flex-1 rounded-lg border border-[#0050cb] px-3 text-sm outline-none"
+                                                disabled={isRenaming}
+                                                onBlur={() => setEditingSessionId(null)}
+                                            />
+                                        </form>
+                                    ) : (
+                                        <>
+                                            <button
+                                                onClick={() => {
+                                                    setCurrentSessionId(session.sessionId);
+                                                    setShowHistorySheet(false);
+                                                }}
+                                                className={`flex flex-1 items-center rounded-xl px-4 py-3.5 text-left text-[15px] transition-colors ${
+                                                    currentSessionId === session.sessionId
+                                                        ? "bg-[#e7eeff] font-medium text-[#0050cb]"
+                                                        : "text-[#111c2d] hover:bg-[#f0f3ff]"
+                                                }`}
+                                            >
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mr-3 shrink-0 opacity-60">
+                                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                                                </svg>
+                                                <span className="truncate pr-8">{session.title || "New conversation"}</span>
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    setEditingSessionId(session.sessionId);
+                                                    setEditingTitle(session.title || "");
+                                                }}
+                                                className="absolute right-3 p-2 text-[#727687] hover:text-[#0050cb]"
+                                                title="Rename"
+                                            >
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                                </svg>
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+            </BottomSheet>
         </div>
     );
 }
