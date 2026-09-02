@@ -7,13 +7,11 @@ app:
   cookie-secure: ${COOKIE_SECURE:false}
   base-url: ${APP_BASE_URL:http://localhost:8080}
   storage:
-    endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
-    # Public URL used to rewrite presigned URLs. Needed when MinIO is behind
-    # a LAN IP or reverse proxy that differs from the internal endpoint.
-    # Example: http://192.168.1.23:9000
+    endpoint: ${MINIO_ENDPOINT:https://viloijycgivaptvvzaly.storage.supabase.co/storage/v1/s3}
+    region: ${MINIO_REGION:ap-northeast-2}
     public-endpoint: ${MINIO_PUBLIC_ENDPOINT:}
-    access-key: ${MINIO_ROOT_USER:givemepic}
-    secret-key: ${MINIO_ROOT_PASSWORD:givemepic_dev_password}
+    access-key: ${MINIO_ROOT_USER:967ce5f4ae05a19589f90f58f6f34d7c}
+    secret-key: ${MINIO_ROOT_PASSWORD:ecbacd096c4c33025246c80fa30441af1fa8e0d59d9c1cc464111f29b0eda1ae}
     bucket: ${MINIO_BUCKET:givemepic-media}
     presigned-url-expiry-seconds: ${MINIO_PRESIGNED_URL_EXPIRY_SECONDS:3600}
   media:
@@ -40,9 +38,10 @@ spring:
   application:
     name: backend
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/givemepic}
-    username: ${DB_USERNAME:givemepic}
-    password: ${DB_PASSWORD:givemepic_dev_password}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://db.viloijycgivaptvvzaly.supabase.co:5432/postgres}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:givemepic2026}
+    driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
       ddl-auto: validate

@@ -148,6 +148,25 @@ export async function updateProfile(payload: { displayName: string; avatarUrl?: 
     });
 }
 
+export async function uploadAvatar(file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch(`/api/auth/avatar`, {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+    });
+
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok) {
+        throw new Error(data?.message ?? "Không thể upload ảnh.");
+    }
+
+    return data as UserProfile;
+}
+
 export async function getSubjects() {
     return request<Subject[]>("/api/subjects", {
         method: "GET",

@@ -10,11 +10,14 @@ import com.givemepic.backend.auth.entity.User;
 import com.givemepic.backend.auth.repository.RefreshTokenRepository;
 import com.givemepic.backend.auth.repository.UserRepository;
 import com.givemepic.backend.common.security.JwtService;
+import com.givemepic.backend.media.storage.ObjectStorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
 
@@ -33,6 +36,7 @@ public class AuthService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final ObjectStorageService storageService;
 
     private static final long REFRESH_TOKEN_EXPIRATION_MS = 604_800_000L; // 7 ngày
 
@@ -80,6 +84,27 @@ public class AuthService {
 
         user.setDisplayName(request.displayName());
         user.setAvatarUrl(request.avatarUrl());
+        userRepository.save(user);
+
+        return new UserProfileResponse(user.getId(), user.getEmail(), user.getDisplayName(), user.getAvatarUrl(), user.getSubscriptionTier());
+    }
+
+    @Transactional
+    public UserProfileResponse uploadAvatar(UUID userId, MultipartFile file) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy người dùng"));
+
+        String extension = StringUtils.getFilenameExtension(file.getOriginalFilename());
+        String objectKey = "avatars/" + userId + "/" + UUID.randomUUID() + (extension != null ? "." + extension : "");
+        
+        storageService.store(objectKey, file);
+
+        // Supabase Storage public URL structure
+        // Since we are using endpoint: https://viloijycgivaptvvzaly.storage.supabase.co/storage/v1/s3
+        // The public URL is: https://viloijycgivaptvvzaly.supabase.co/storage/v1/object/public/givemepic-media/{objectKey}
+        String publicUrl = "https://viloijycgivaptvvzaly.supabase.co/storage/v1/object/public/givemepic-media/" + objectKey;
+        
+        user.setAvatarUrl(publicUrl);
         userRepository.save(user);
 
         return new UserProfileResponse(user.getId(), user.getEmail(), user.getDisplayName(), user.getAvatarUrl(), user.getSubscriptionTier());

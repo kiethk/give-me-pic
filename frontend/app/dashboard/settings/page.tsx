@@ -1,35 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { getProfile, updateProfile, UserProfile } from "@/lib/api-client";
+import { getProfile, updateProfile, uploadAvatar, UserProfile } from "@/lib/api-client";
 import { useRouter } from "next/navigation";
-
-const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME!;
-const UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET!;
-
-async function uploadToCloudinary(file: File): Promise<string> {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("upload_preset", UPLOAD_PRESET);
-    formData.append("folder", "avatars");
-
-    const res = await fetch(
-        `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
-        { method: "POST", body: formData }
-    );
-
-    if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err?.error?.message || "Upload failed");
-    }
-
-    const data = await res.json();
-    // Return optimized URL: face-centered crop, 256px
-    return data.secure_url.replace(
-        "/upload/",
-        "/upload/c_fill,g_face,h_256,w_256,q_auto,f_auto/"
-    );
-}
 
 export default function SettingsPage() {
     const router = useRouter();
@@ -74,11 +47,14 @@ export default function SettingsPage() {
         setPreviewUrl(blob);
         setError("");
 
-        // Upload to Cloudinary
+        // Upload to Backend (which stores in Supabase)
         setIsUploading(true);
         try {
-            const url = await uploadToCloudinary(file);
-            setAvatarUrl(url);
+            const updatedProfile = await uploadAvatar(file);
+            setProfile(updatedProfile);
+            setAvatarUrl(updatedProfile.avatarUrl || "");
+            setPreviewUrl(updatedProfile.avatarUrl || "");
+            setSuccessMsg("Đã upload ảnh đại diện thành công!");
         } catch (err) {
             setError(err instanceof Error ? err.message : "Upload thất bại. Thử lại nhé.");
             setPreviewUrl(profile?.avatarUrl || ""); // revert preview
@@ -211,7 +187,7 @@ export default function SettingsPage() {
                     {isUploading && (
                         <div className="mt-4 flex items-center gap-2 rounded-lg bg-[#f0f3ff] px-3 py-2.5 text-[13px] text-[#424656]">
                             <div className="h-4 w-4 rounded-full border-2 border-[#0050cb] border-t-transparent animate-spin shrink-0" />
-                            Đang upload lên Cloudinary…
+                            Đang tải lên hệ thống…
                         </div>
                     )}
                     {avatarUrl && !isUploading && avatarUrl !== (profile?.avatarUrl || "") && (

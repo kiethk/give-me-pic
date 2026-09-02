@@ -26,6 +26,7 @@ public class MinioStorageService implements ObjectStorageService {
 
     public MinioStorageService(
             @Value("${app.storage.endpoint}") String endpoint,
+            @Value("${app.storage.region:us-east-1}") String region,
             @Value("${app.storage.public-endpoint:}") String publicEndpoint,
             @Value("${app.storage.access-key}") String accessKey,
             @Value("${app.storage.secret-key}") String secretKey,
@@ -33,6 +34,7 @@ public class MinioStorageService implements ObjectStorageService {
             @Value("${app.storage.presigned-url-expiry-seconds:3600}") int presignedUrlExpirySeconds) {
         this.minioClient = MinioClient.builder()
                 .endpoint(endpoint)
+                .region(region)
                 .credentials(accessKey, secretKey)
                 .build();
         this.bucket = bucket;

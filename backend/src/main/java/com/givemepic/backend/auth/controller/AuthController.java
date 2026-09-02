@@ -50,6 +50,13 @@ public class AuthController {
         return ResponseEntity.ok(authService.updateProfile(userId, request));
     }
 
+    @PostMapping("/avatar")
+    public ResponseEntity<UserProfileResponse> uploadAvatar(
+            @AuthenticationPrincipal UUID userId,
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        return ResponseEntity.ok(authService.uploadAvatar(userId, file));
+    }
+
         @PostMapping("/logout")
         public ResponseEntity<Void> logout() {
         ResponseCookie accessCookie = ResponseCookie.from("access_token", "")
