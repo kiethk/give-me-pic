@@ -38,8 +38,8 @@ spring:
   application:
     name: backend
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://db.viloijycgivaptvvzaly.supabase.co:5432/postgres}
-    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres.viloijycgivaptvvzaly}
     password: ${SPRING_DATASOURCE_PASSWORD:givemepic2026}
     driver-class-name: org.postgresql.Driver
   jpa:
