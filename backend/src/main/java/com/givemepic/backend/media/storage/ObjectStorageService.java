@@ -11,4 +11,6 @@ public interface ObjectStorageService {
     byte[] download(String objectKey);
 
     String createDownloadUrl(String objectKey);
+    
+    String createPresignedPutUrl(String objectKey, String contentType);
 }

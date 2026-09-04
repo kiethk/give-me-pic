@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -40,14 +41,34 @@ public class MediaController {
         return ResponseEntity.ok(mediaService.list(userId));
     }
 
-    @PostMapping("/upload")
-    public ResponseEntity<MediaResponse> upload(
+    @GetMapping("/presigned-url")
+    public ResponseEntity<Map<String, String>> getPresignedUrl(
+            @AuthenticationPrincipal UUID userId,
+            @RequestParam UUID subjectId,
+            @RequestParam String fileName,
+            @RequestParam String contentType) {
+        
+        String objectKey = mediaService.generateObjectKey(userId, subjectId, fileName);
+        String url = objectStorageService.createPresignedPutUrl(objectKey, contentType);
+        
+        return ResponseEntity.ok(Map.of(
+                "url", url,
+                "objectKey", objectKey
+        ));
+    }
+
+    @PostMapping("/confirm-upload")
+    public ResponseEntity<MediaResponse> confirmUpload(
             @AuthenticationPrincipal UUID userId,
             @RequestParam UUID subjectId,
             @RequestParam(required = false) String caption,
             @RequestParam(required = false) UUID clientUploadId,
-            @RequestPart("file") MultipartFile file) {
-        MediaResponse response = mediaService.upload(userId, subjectId, caption, clientUploadId, file);
+            @RequestParam String objectKey,
+            @RequestParam String fileName,
+            @RequestParam String contentType,
+            @RequestParam long sizeBytes) {
+        
+        MediaResponse response = mediaService.confirmUpload(userId, subjectId, caption, clientUploadId, objectKey, fileName, contentType, sizeBytes);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 

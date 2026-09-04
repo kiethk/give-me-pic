@@ -66,8 +66,16 @@ public class MediaService {
                 .toList();
     }
 
+    public String generateObjectKey(UUID userId, UUID subjectId, String originalName) {
+        validateSubjectOwnership(userId, subjectId);
+        String sanitizedName = originalName.replace("\\", "/");
+        String storedName = UUID.randomUUID() + "_" + sanitizedName.substring(sanitizedName.lastIndexOf('/') + 1);
+        return userId + "/" + subjectId + "/" + storedName;
+    }
+
     @Transactional
-    public MediaResponse upload(UUID userId, UUID subjectId, String caption, UUID clientUploadId, MultipartFile file) {
+    public MediaResponse confirmUpload(UUID userId, UUID subjectId, String caption, UUID clientUploadId, 
+                                       String objectKey, String fileName, String contentType, long sizeBytes) {
         if (clientUploadId != null) {
             Optional<Media> existing = mediaRepository.findByUserIdAndClientUploadId(userId, clientUploadId);
             if (existing.isPresent()) {
@@ -77,28 +85,17 @@ public class MediaService {
         }
 
         validateSubjectOwnership(userId, subjectId);
-        if (file == null || file.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "File không được để trống");
-        }
-        if (file.getContentType() == null || !file.getContentType().startsWith("image/")) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Chỉ hỗ trợ file hình ảnh");
-        }
-        if (file.getSize() > maxFileSizeBytes) {
+        if (sizeBytes > maxFileSizeBytes) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ảnh vượt quá dung lượng cho phép");
         }
-        String originalName = Objects.requireNonNullElse(file.getOriginalFilename(), "upload");
-        String sanitizedName = originalName.replace("\\", "/");
-        String storedName = UUID.randomUUID() + "_" + sanitizedName.substring(sanitizedName.lastIndexOf('/') + 1);
-        String objectKey = userId + "/" + subjectId + "/" + storedName;
         try {
-            objectStorageService.store(objectKey, file);
             Media media = Media.builder()
                     .userId(userId)
                     .subjectId(subjectId)
-                    .fileName(originalName)
-                    .storedName(storedName)
-                    .contentType(file.getContentType())
-                    .sizeBytes(file.getSize())
+                    .fileName(fileName)
+                    .storedName(objectKey.substring(objectKey.lastIndexOf('/') + 1))
+                    .contentType(contentType)
+                    .sizeBytes(sizeBytes)
                     .caption(caption)
                     .storagePath(objectKey)
                     .url(objectKey)

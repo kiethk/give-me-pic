@@ -1,6 +1,5 @@
-// API calls can use NEXT_PUBLIC_API_URL to point directly to the backend.
-// This bypasses Vercel edge function limits (like the 4.5MB body limit) and rewrite bugs with multipart/form-data.
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
+// API calls use relative paths — Next.js rewrites proxy them to the backend.
+// This ensures Vercel cookies (auth) are properly set and sent.
 
 
 type AuthPayload = {
@@ -130,7 +129,7 @@ export async function login(payload: Omit<AuthPayload, "displayName">) {
 }
 
 export async function getProfile() {
-    const response = await fetch(`${API_BASE}/api/auth/me`, {
+    const response = await fetch(`/api/auth/me`, {
         credentials: "include",
     });
     const data = await response.json().catch(() => null);
@@ -153,7 +152,7 @@ export async function uploadAvatar(file: File) {
     const formData = new FormData();
     formData.append("file", file);
 
-    const response = await fetch(`${API_BASE}/api/auth/avatar`, {
+    const response = await fetch(`/api/auth/avatar`, {
         method: "POST",
         credentials: "include",
         body: formData,
@@ -222,27 +221,47 @@ export async function uploadMedia(
     caption?: string,
     clientUploadId?: string,
 ) {
-    const formData = new FormData();
-    formData.append("file", file);
+    // 1. Get presigned URL
+    const presignedParams = new URLSearchParams({
+        subjectId,
+        fileName: file.name,
+        contentType: file.type || "application/octet-stream"
+    });
+    
+    const presignedResponse = await request<{url: string, objectKey: string}>(`/api/media/presigned-url?${presignedParams.toString()}`, {
+        method: "GET"
+    });
+    
+    // 2. Upload directly to S3 (bypass Vercel)
+    const s3Response = await fetch(presignedResponse.url, {
+        method: "PUT",
+        headers: {
+            "Content-Type": file.type || "application/octet-stream"
+        },
+        body: file
+    });
+    
+    if (!s3Response.ok) {
+        throw new Error("Không thể upload ảnh lên máy chủ lưu trữ.");
+    }
+    
+    // 3. Confirm upload with backend
+    const confirmParams = new URLSearchParams({
+        subjectId,
+        objectKey: presignedResponse.objectKey,
+        fileName: file.name,
+        contentType: file.type || "application/octet-stream",
+        sizeBytes: file.size.toString()
+    });
+    
+    if (caption) confirmParams.append("caption", caption);
+    if (clientUploadId) confirmParams.append("clientUploadId", clientUploadId);
 
-    const params = new URLSearchParams();
-    params.append("subjectId", subjectId);
-    if (caption) params.append("caption", caption);
-    if (clientUploadId) params.append("clientUploadId", clientUploadId);
-
-    const response = await fetch(`${API_BASE}/api/media/upload?${params.toString()}`, {
-        method: "POST",
-        credentials: "include",
-        body: formData,
+    const data = await request<MediaItem>(`/api/media/confirm-upload?${confirmParams.toString()}`, {
+        method: "POST"
     });
 
-    const data = await response.json().catch(() => null);
-
-    if (!response.ok) {
-        throw new Error(data?.message ?? "Không thể upload file.");
-    }
-
-    const item = data as MediaItem;
+    const item = data;
     item.url = ensureAbsoluteUrl(item.url);
     return item;
 }
@@ -260,7 +279,7 @@ export async function retryProcessing(mediaId: string) {
 }
 
 export async function logout() {
-    await fetch(`${API_BASE}/api/auth/logout`, {
+    await fetch(`/api/auth/logout`, {
         method: "POST",
         credentials: "include",
     });
@@ -274,7 +293,7 @@ async function request<T>(
         body?: Record<string, unknown>;
     },
 ): Promise<T> {
-    const response = await fetch(`${API_BASE}${path}`, {
+    const response = await fetch(`${path}`, {
         method: options.method,
         headers: options.body ? { "Content-Type": "application/json" } : undefined,
         credentials: "include",

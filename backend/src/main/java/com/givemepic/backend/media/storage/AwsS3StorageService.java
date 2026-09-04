@@ -12,6 +12,8 @@ import software.amazon.awssdk.services.s3.model.*;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequest;
 
 import java.net.URI;
 import java.time.Duration;
@@ -129,6 +131,34 @@ public class AwsS3StorageService implements ObjectStorageService {
             return url;
         } catch (Exception ex) {
             throw new IllegalStateException("Không thể tạo download URL từ S3 Storage", ex);
+        }
+    }
+
+    @Override
+    public String createPresignedPutUrl(String objectKey, String contentType) {
+        ensureBucket();
+        try {
+            PutObjectRequest putObjectRequest = PutObjectRequest.builder()
+                    .bucket(bucket)
+                    .key(objectKey)
+                    .contentType(contentType == null ? "application/octet-stream" : contentType)
+                    .build();
+
+            PutObjectPresignRequest putObjectPresignRequest = PutObjectPresignRequest.builder()
+                    .signatureDuration(Duration.ofSeconds(presignedUrlExpirySeconds))
+                    .putObjectRequest(putObjectRequest)
+                    .build();
+
+            PresignedPutObjectRequest presignedPutObjectRequest = s3Presigner.presignPutObject(putObjectPresignRequest);
+            String url = presignedPutObjectRequest.url().toString();
+
+            // Rewrite internal endpoint to public endpoint so LAN/internet clients can access the URL.
+            if (publicEndpoint != null && url.startsWith(internalEndpoint)) {
+                url = publicEndpoint + url.substring(internalEndpoint.length());
+            }
+            return url;
+        } catch (Exception ex) {
+            throw new IllegalStateException("Không thể tạo upload URL từ S3 Storage", ex);
         }
     }
 
