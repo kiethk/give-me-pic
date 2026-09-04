@@ -72,7 +72,7 @@ public class AwsS3StorageService implements ObjectStorageService {
                     .contentType(file.getContentType() == null ? "application/octet-stream" : file.getContentType())
                     .build();
 
-            s3Client.putObject(putObjectRequest, RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
+            s3Client.putObject(putObjectRequest, RequestBody.fromBytes(file.getBytes()));
         } catch (Exception ex) {
             throw new IllegalStateException("Không thể upload object lên S3 Storage", ex);
         }
