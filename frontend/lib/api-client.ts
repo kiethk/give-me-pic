@@ -1,5 +1,6 @@
-// API calls use relative paths — Next.js rewrites proxy them to the backend.
-// This ensures the app works on any host (localhost, LAN IP, production domain).
+// API calls can use NEXT_PUBLIC_API_URL to point directly to the backend.
+// This bypasses Vercel edge function limits (like the 4.5MB body limit) and rewrite bugs with multipart/form-data.
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 
 type AuthPayload = {
@@ -129,7 +130,7 @@ export async function login(payload: Omit<AuthPayload, "displayName">) {
 }
 
 export async function getProfile() {
-    const response = await fetch(`/api/auth/me`, {
+    const response = await fetch(`${API_BASE}/api/auth/me`, {
         credentials: "include",
     });
     const data = await response.json().catch(() => null);
@@ -152,7 +153,7 @@ export async function uploadAvatar(file: File) {
     const formData = new FormData();
     formData.append("file", file);
 
-    const response = await fetch(`/api/auth/avatar`, {
+    const response = await fetch(`${API_BASE}/api/auth/avatar`, {
         method: "POST",
         credentials: "include",
         body: formData,
@@ -229,7 +230,7 @@ export async function uploadMedia(
     if (caption) params.append("caption", caption);
     if (clientUploadId) params.append("clientUploadId", clientUploadId);
 
-    const response = await fetch(`/api/media/upload?${params.toString()}`, {
+    const response = await fetch(`${API_BASE}/api/media/upload?${params.toString()}`, {
         method: "POST",
         credentials: "include",
         body: formData,
@@ -259,7 +260,7 @@ export async function retryProcessing(mediaId: string) {
 }
 
 export async function logout() {
-    await fetch(`/api/auth/logout`, {
+    await fetch(`${API_BASE}/api/auth/logout`, {
         method: "POST",
         credentials: "include",
     });
@@ -273,7 +274,7 @@ async function request<T>(
         body?: Record<string, unknown>;
     },
 ): Promise<T> {
-    const response = await fetch(`${path}`, {
+    const response = await fetch(`${API_BASE}${path}`, {
         method: options.method,
         headers: options.body ? { "Content-Type": "application/json" } : undefined,
         credentials: "include",

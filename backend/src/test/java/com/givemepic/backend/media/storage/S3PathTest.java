@@ -20,8 +20,11 @@ public class S3PathTest {
                 .build();
         
         try {
-            s3Client.headBucket(HeadBucketRequest.builder().bucket("givemepic-media").build());
-            System.out.println("SUCCESS");
+            s3Client.putObject(software.amazon.awssdk.services.s3.model.PutObjectRequest.builder()
+                    .bucket("givemepic-media")
+                    .key("test-upload.txt")
+                    .build(), software.amazon.awssdk.core.sync.RequestBody.fromString("hello world"));
+            System.out.println("SUCCESS_UPLOAD");
         } catch (Exception e) {
             e.printStackTrace();
         }
