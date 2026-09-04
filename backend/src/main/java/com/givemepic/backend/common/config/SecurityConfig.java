@@ -53,7 +53,10 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(java.util.List.of(frontendOrigin));
+        
+        // Use patterns to support wildcards like https://*.vercel.app for preview deployments
+        java.util.List<String> origins = java.util.Arrays.asList(frontendOrigin.split(","));
+        configuration.setAllowedOriginPatterns(origins);
         configuration.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(java.util.List.of("Authorization", "Content-Type"));
         configuration.setAllowCredentials(true);
