@@ -175,19 +175,32 @@ export default function SubjectsPage() {
     const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
     const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
-    async function load() {
-        try {
-            const data = await getSubjects();
-            setSubjects(data.filter((s) => !s.archived));
-        } catch {
-            // redirect if unauthenticated
-        } finally {
-            setIsLoading(false);
+    useEffect(() => {
+        let active = true;
+        async function load() {
+            try {
+                const data = await getSubjects();
+                if (active) {
+                    setSubjects((prev) => {
+                        const fetched = data.filter((s) => !s.archived);
+                        const fetchedIds = new Set(fetched.map((s) => s.id));
+                        const newlyCreated = prev.filter((p) => !fetchedIds.has(p.id));
+                        return [...newlyCreated, ...fetched];
+                    });
+                }
+            } catch {
+                // redirect if unauthenticated
+            } finally {
+                if (active) {
+                    setIsLoading(false);
+                }
+            }
         }
-    }
-
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    useEffect(() => { load(); }, []);
+        load();
+        return () => {
+            active = false;
+        };
+    }, []);
 
     useEffect(() => {
         function handleClickOutside() {

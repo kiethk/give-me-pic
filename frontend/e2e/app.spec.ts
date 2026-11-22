@@ -7,6 +7,7 @@ test.describe('Give Me Pic - Public & Auth Routes', () => {
     await expect(page.locator('input[type="email"], input[name="email"]')).toBeVisible();
     await expect(page.locator('input[type="password"]')).toBeVisible();
     await expect(page.getByRole('button', { name: /sign in|log in|đăng nhập/i })).toBeVisible();
+    await expect(page.getByTestId('google-signin-btn')).toBeVisible();
   });
 
   test('Register page renders correctly', async ({ page }) => {
@@ -14,6 +15,26 @@ test.describe('Give Me Pic - Public & Auth Routes', () => {
     await expect(page.locator('input[type="email"], input[name="email"]')).toBeVisible();
     await expect(page.locator('input[type="password"]')).toBeVisible();
     await expect(page.getByRole('button', { name: /create account|sign up|register|tạo/i })).toBeVisible();
+    await expect(page.getByTestId('google-signin-btn')).toBeVisible();
+  });
+
+  test('Google Sign-In button handles unconfigured client ID gracefully', async ({ page }) => {
+    await page.goto('/login');
+    const googleBtn = page.getByTestId('google-signin-btn');
+    await expect(googleBtn).toBeVisible();
+    await googleBtn.click();
+    await expect(page.locator('body')).toContainText(/Google Sign-In/i);
+  });
+
+  test('Navigation between login and register retains Google button', async ({ page }) => {
+    await page.goto('/login');
+    await expect(page.getByTestId('google-signin-btn')).toBeVisible();
+    await page.getByRole('link', { name: /create one/i }).click();
+    await page.waitForURL(/\/register/);
+    await expect(page.getByTestId('google-signin-btn')).toBeVisible();
+    await page.getByRole('link', { name: /sign in/i }).click();
+    await page.waitForURL(/\/login/);
+    await expect(page.getByTestId('google-signin-btn')).toBeVisible();
   });
 
   test('Offline fallback page renders correctly', async ({ page }) => {

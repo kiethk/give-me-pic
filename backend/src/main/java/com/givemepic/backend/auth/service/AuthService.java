@@ -1,6 +1,8 @@
 package com.givemepic.backend.auth.service;
 
 import com.givemepic.backend.auth.dto.AuthResponse;
+import com.givemepic.backend.auth.dto.GoogleAuthRequest;
+import com.givemepic.backend.auth.dto.GoogleTokenPayload;
 import com.givemepic.backend.auth.dto.LoginRequest;
 import com.givemepic.backend.auth.dto.RegisterRequest;
 import com.givemepic.backend.auth.dto.UpdateProfileRequest;
@@ -37,6 +39,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final ObjectStorageService storageService;
+    private final GoogleTokenVerifier googleTokenVerifier;
 
     private static final long REFRESH_TOKEN_EXPIRATION_MS = 604_800_000L; // 7 ngày
 
@@ -62,9 +65,57 @@ public class AuthService {
         User user = userRepository.findByEmail(request.email())
                 .orElseThrow(() -> new BadCredentialsException("Email hoặc mật khẩu không đúng"));
 
-        if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+        if (user.getPasswordHash() == null || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             throw new BadCredentialsException("Email hoặc mật khẩu không đúng");
         }
+
+        return buildAuthResponse(user);
+    }
+
+    @Transactional
+    public AuthResponse authenticateWithGoogle(GoogleAuthRequest request) {
+        GoogleTokenPayload payload = googleTokenVerifier.verify(request.idToken());
+
+        String email = payload.email() != null ? payload.email().trim().toLowerCase() : "";
+        String sub = payload.sub();
+        String name = payload.name();
+        String picture = payload.picture();
+
+        String safeAvatarUrl = null;
+        if (StringUtils.hasText(picture) && picture.trim().length() <= 500) {
+            safeAvatarUrl = picture.trim();
+        }
+
+        final String avatarUrlToUse = safeAvatarUrl;
+
+        User user = userRepository.findByEmailIgnoreCase(email).map(existingUser -> {
+            boolean updated = false;
+            if (existingUser.getProviderId() == null || !existingUser.getProviderId().equals(sub)) {
+                existingUser.setProviderId(sub);
+                existingUser.setProvider("google");
+                updated = true;
+            }
+            if ((existingUser.getAvatarUrl() == null || existingUser.getAvatarUrl().isBlank()) && StringUtils.hasText(avatarUrlToUse)) {
+                existingUser.setAvatarUrl(avatarUrlToUse);
+                updated = true;
+            }
+            if (updated) {
+                return userRepository.save(existingUser);
+            }
+            return existingUser;
+        }).orElseGet(() -> {
+            String rawDisplayName = StringUtils.hasText(name) ? name.trim() : email.split("@")[0];
+            String displayName = rawDisplayName.length() > 100 ? rawDisplayName.substring(0, 100) : rawDisplayName;
+            User newUser = User.builder()
+                    .email(email)
+                    .displayName(displayName)
+                    .avatarUrl(avatarUrlToUse)
+                    .provider("google")
+                    .providerId(sub)
+                    .passwordHash(null)
+                    .build();
+            return userRepository.save(newUser);
+        });
 
         return buildAuthResponse(user);
     }

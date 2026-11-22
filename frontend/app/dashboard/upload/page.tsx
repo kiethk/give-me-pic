@@ -22,6 +22,18 @@ function Thumbnail({ buffer, type, alt }: { buffer: ArrayBuffer; type: string; a
     );
 }
 
+function inferMimeType(fileName: string, currentType?: string): string {
+    if (currentType && currentType.startsWith("image/")) {
+        return currentType;
+    }
+    const lower = fileName.toLowerCase();
+    if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+    if (lower.endsWith(".png")) return "image/png";
+    if (lower.endsWith(".webp")) return "image/webp";
+    if (lower.endsWith(".heic")) return "image/heic";
+    return currentType || "";
+}
+
 interface StagedFile {
     file: File;
     buffer: ArrayBuffer;
@@ -58,11 +70,27 @@ export default function UploadPage() {
 
     async function handleIncomingFiles(files: FileList | File[]) {
         try {
-            if (files.length === 0) return;
-            const validFiles = Array.from(files).filter((f) => {
+            const rawFiles = Array.from(files);
+            if (rawFiles.length === 0) return;
+
+            const normalizedFiles = rawFiles.map((file, idx) => {
+                let fileName = file.name;
+                const lowerName = fileName.toLowerCase();
+                if (lowerName === "image.jpg" || lowerName === "image.jpeg") {
+                    const ext = lowerName.endsWith(".jpeg") ? "jpeg" : "jpg";
+                    fileName = `photo_${Date.now()}_${idx}.${ext}`;
+                }
+
+                const fileType = inferMimeType(fileName, file.type);
+                if (fileName !== file.name || fileType !== file.type) {
+                    return new File([file], fileName, { type: fileType, lastModified: file.lastModified });
+                }
+                return file;
+            });
+
+            const validFiles = normalizedFiles.filter((f) => {
                 return (
                     f.type.startsWith("image/") ||
-                    !f.type ||
                     f.name.toLowerCase().endsWith(".jpg") ||
                     f.name.toLowerCase().endsWith(".jpeg") ||
                     f.name.toLowerCase().endsWith(".png") ||
@@ -87,7 +115,7 @@ export default function UploadPage() {
             setStagedFiles((prev) => [...prev, ...staged]);
 
             // Run AI suggestion using the first file
-            const firstFile = validFiles[0];
+            const firstFile = staged[0].file;
             setIsAnalyzing(true);
             setAiStatusMessage("");
 

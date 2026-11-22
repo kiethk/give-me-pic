@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { login } from "@/lib/api-client";
+import GoogleSignInButton from "@/components/GoogleSignInButton";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -91,6 +92,15 @@ export default function LoginPage() {
             "Sign in"
           )}
         </button>
+
+        <div className="relative my-6 flex items-center justify-center">
+          <div className="w-full border-t border-[#e2e8f0]" />
+          <span className="absolute bg-white px-3 text-xs uppercase tracking-wider text-[#727687]">
+            or
+          </span>
+        </div>
+
+        <GoogleSignInButton mode="login" onError={setMessage} />
       </form>
 
       <p className="mt-8 text-center text-sm text-[#727687]">

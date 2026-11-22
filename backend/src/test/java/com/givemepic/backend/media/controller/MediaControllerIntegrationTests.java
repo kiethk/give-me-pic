@@ -85,6 +85,38 @@ class MediaControllerIntegrationTests {
     }
 
     @Test
+    void uploadAcceptsOctetStreamOrNullWithImageExtension() throws Exception {
+        Cookie accessCookie = registerUserAndGetAccessCookie();
+        String subjectId = createSubject(accessCookie);
+
+        MockMultipartFile octetStreamFile = new MockMultipartFile(
+                "file",
+                "image.jpg",
+                MediaType.APPLICATION_OCTET_STREAM_VALUE,
+                "fake-image-content".getBytes());
+
+        mockMvc.perform(multipart("/api/media/upload")
+                .file(octetStreamFile)
+                .param("subjectId", subjectId)
+                .cookie(accessCookie))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.fileName").value("image.jpg"));
+
+        MockMultipartFile nullContentTypeFile = new MockMultipartFile(
+                "file",
+                "photo.png",
+                null,
+                "fake-image-content".getBytes());
+
+        mockMvc.perform(multipart("/api/media/upload")
+                .file(nullContentTypeFile)
+                .param("subjectId", subjectId)
+                .cookie(accessCookie))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.fileName").value("photo.png"));
+    }
+
+    @Test
     void authenticatedUserCanDeleteMedia() throws Exception {
         Cookie accessCookie = registerUserAndGetAccessCookie();
         String subjectId = createSubject(accessCookie);

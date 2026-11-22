@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.net.URLConnection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -80,13 +81,14 @@ public class MediaService {
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "File không được để trống");
         }
-        if (file.getContentType() == null || !file.getContentType().startsWith("image/")) {
+        String originalName = Objects.requireNonNullElse(file.getOriginalFilename(), "upload");
+        String resolvedContentType = resolveImageContentType(file.getContentType(), originalName);
+        if (resolvedContentType == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Chỉ hỗ trợ file hình ảnh");
         }
         if (file.getSize() > maxFileSizeBytes) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ảnh vượt quá dung lượng cho phép");
         }
-        String originalName = Objects.requireNonNullElse(file.getOriginalFilename(), "upload");
         String objectKey = generateObjectKey(userId, subjectId, originalName);
         String storedName = objectKey.substring(objectKey.lastIndexOf('/') + 1);
         try {
@@ -96,7 +98,7 @@ public class MediaService {
                     .subjectId(subjectId)
                     .fileName(originalName)
                     .storedName(storedName)
-                    .contentType(file.getContentType())
+                    .contentType(resolvedContentType)
                     .sizeBytes(file.getSize())
                     .caption(caption)
                     .storagePath(objectKey)
@@ -142,13 +144,17 @@ public class MediaService {
         if (sizeBytes > maxFileSizeBytes) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ảnh vượt quá dung lượng cho phép");
         }
+        String resolvedContentType = resolveImageContentType(contentType, fileName);
+        if (resolvedContentType == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Chỉ hỗ trợ file hình ảnh");
+        }
         try {
             Media media = Media.builder()
                     .userId(userId)
                     .subjectId(subjectId)
                     .fileName(fileName)
                     .storedName(objectKey.substring(objectKey.lastIndexOf('/') + 1))
-                    .contentType(contentType)
+                    .contentType(resolvedContentType)
                     .sizeBytes(sizeBytes)
                     .caption(caption)
                     .storagePath(objectKey)
@@ -204,5 +210,35 @@ public class MediaService {
     private Subject validateSubjectOwnership(UUID userId, UUID subjectId) {
         return subjectRepository.findByIdAndUserId(subjectId, userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy môn học"));
+    }
+
+    private String resolveImageContentType(String contentType, String fileName) {
+        if (contentType != null && !contentType.isBlank()
+                && !"application/octet-stream".equalsIgnoreCase(contentType.trim())
+                && contentType.startsWith("image/")) {
+            return contentType;
+        }
+
+        if (fileName != null && !fileName.isBlank()) {
+            String lower = fileName.toLowerCase();
+            if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) {
+                return "image/jpeg";
+            } else if (lower.endsWith(".png")) {
+                return "image/png";
+            } else if (lower.endsWith(".webp")) {
+                return "image/webp";
+            } else if (lower.endsWith(".heic")) {
+                return "image/heic";
+            } else if (lower.endsWith(".heif")) {
+                return "image/heif";
+            }
+
+            String guessed = URLConnection.guessContentTypeFromName(fileName);
+            if (guessed != null && guessed.startsWith("image/")) {
+                return guessed;
+            }
+        }
+
+        return null;
     }
 }

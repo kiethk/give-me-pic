@@ -24,6 +24,18 @@ function generateId() {
         return v.toString(16);
     });
 }
+
+function inferMimeType(fileName: string, currentType?: string): string {
+    if (currentType && currentType.startsWith("image/")) {
+        return currentType;
+    }
+    const lower = fileName.toLowerCase();
+    if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+    if (lower.endsWith(".png")) return "image/png";
+    if (lower.endsWith(".webp")) return "image/webp";
+    if (lower.endsWith(".heic")) return "image/heic";
+    return currentType || "";
+}
 import {
     enqueue,
     getAllUploads,
@@ -102,18 +114,15 @@ export function useUploadQueue(onUploadSuccess?: () => void): UseUploadQueue {
 
                 try {
                     // Reconstruct a File from the ArrayBuffer stored in IndexedDB
-                    const file = new File([item.fileBuffer], item.fileName, { type: item.fileType });
-                    const apiUrl = process.env.NEXT_PUBLIC_API_URL
-                        ?? (typeof window !== "undefined"
-                            ? `${window.location.protocol}//${window.location.hostname}:8080`
-                            : "http://localhost:8080");
+                    const fileType = inferMimeType(item.fileName, item.fileType) || item.fileType || "image/jpeg";
+                    const file = new File([item.fileBuffer], item.fileName, { type: fileType });
                     const params = new URLSearchParams();
                     params.append("subjectId", item.subjectId);
                     if (item.caption) params.append("caption", item.caption);
                     params.append("clientUploadId", item.clientUploadId);
 
                     const response = await fetch(
-                        `${apiUrl}/api/media/upload?${params.toString()}`,
+                        `/api/media/upload?${params.toString()}`,
                         {
                             method: "POST",
                             credentials: "include",
@@ -140,7 +149,8 @@ export function useUploadQueue(onUploadSuccess?: () => void): UseUploadQueue {
 
                     if (!response.ok) {
                         const data = await response.json().catch(() => null);
-                        throw new Error(data?.message ?? "Upload failed.");
+                        const errorMessage = data?.message || data?.error || `Upload failed (${response.status})`;
+                        throw new Error(errorMessage);
                     }
 
                     await removeFromQueue(item.clientUploadId);
@@ -200,6 +210,7 @@ export function useUploadQueue(onUploadSuccess?: () => void): UseUploadQueue {
     const addToQueue = useCallback(
         async (subjectId: string, file: File, buffer: ArrayBuffer, caption?: string) => {
             const clientUploadId = generateId();
+            const fileType = inferMimeType(file.name, file.type) || file.type || "image/jpeg";
 
             await enqueue({
                 clientUploadId,
@@ -207,7 +218,7 @@ export function useUploadQueue(onUploadSuccess?: () => void): UseUploadQueue {
                 caption: caption ?? null,
                 fileName: file.name,
                 fileBuffer: buffer,
-                fileType: file.type,
+                fileType,
                 fileSizeBytes: file.size,
             });
 

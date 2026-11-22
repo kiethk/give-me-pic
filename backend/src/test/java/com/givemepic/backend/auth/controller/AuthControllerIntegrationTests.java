@@ -5,9 +5,14 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 import jakarta.servlet.http.Cookie;
+import com.givemepic.backend.auth.service.GoogleTokenVerifier;
+import com.givemepic.backend.auth.dto.GoogleTokenPayload;
 
 import java.util.UUID;
 
@@ -21,6 +26,9 @@ class AuthControllerIntegrationTests {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @MockitoBean
+    private GoogleTokenVerifier googleTokenVerifier;
 
     @Test
     void registerIsPublicAndReturnsTokens() throws Exception {
@@ -161,5 +169,55 @@ class AuthControllerIntegrationTests {
                         .content("{\"email\":\"rate-limit@example.com\",\"password\":\"wrong\"}"))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.message").value("Too many requests. Please try again later."));
+    }
+
+    @Test
+    void googleLoginReturnsTokensForValidIdToken() throws Exception {
+        String googleEmail = "google-" + UUID.randomUUID() + "@example.com";
+        GoogleTokenPayload payload = new GoogleTokenPayload(
+                "google-sub-" + UUID.randomUUID(),
+                googleEmail,
+                "true",
+                "Google User",
+                "https://example.com/avatar.png",
+                "test-aud",
+                "https://accounts.google.com"
+        );
+        org.mockito.Mockito.when(googleTokenVerifier.verify("valid-google-id-token")).thenReturn(payload);
+
+        mockMvc.perform(post("/api/auth/google")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"idToken\":\"valid-google-id-token\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                .andExpect(jsonPath("$.refreshToken").isNotEmpty())
+                .andExpect(jsonPath("$.email").value(googleEmail))
+                .andExpect(result -> {
+                    org.hamcrest.MatcherAssert.assertThat(result.getResponse().getHeaders("Set-Cookie"),
+                            org.hamcrest.Matchers.hasSize(2));
+                    org.hamcrest.MatcherAssert.assertThat(result.getResponse().getHeaders("Set-Cookie").toString(),
+                            org.hamcrest.Matchers.allOf(
+                                    org.hamcrest.Matchers.containsString("access_token="),
+                                    org.hamcrest.Matchers.containsString("refresh_token=")));
+                });
+    }
+
+    @Test
+    void googleLoginRejectsEmptyIdToken() throws Exception {
+        mockMvc.perform(post("/api/auth/google")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"idToken\":\"\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void googleLoginRejectsInvalidGoogleToken() throws Exception {
+        org.mockito.Mockito.when(googleTokenVerifier.verify("invalid-token"))
+                .thenThrow(new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Google ID token không hợp lệ hoặc đã hết hạn"));
+
+        mockMvc.perform(post("/api/auth/google")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"idToken\":\"invalid-token\"}"))
+                .andExpect(status().isUnauthorized());
     }
 }

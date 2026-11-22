@@ -128,6 +128,13 @@ export async function login(payload: Omit<AuthPayload, "displayName">) {
     });
 }
 
+export async function loginWithGoogle(idToken: string) {
+    return request<AuthResponse>("/api/auth/google", {
+        method: "POST",
+        body: { idToken },
+    });
+}
+
 export async function getProfile() {
     const response = await fetch(`/api/auth/me`, {
         credentials: "include",

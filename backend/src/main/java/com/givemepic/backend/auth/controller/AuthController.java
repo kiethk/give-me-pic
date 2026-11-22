@@ -1,6 +1,7 @@
 package com.givemepic.backend.auth.controller;
 
 import com.givemepic.backend.auth.dto.AuthResponse;
+import com.givemepic.backend.auth.dto.GoogleAuthRequest;
 import com.givemepic.backend.auth.dto.LoginRequest;
 import com.givemepic.backend.auth.dto.RegisterRequest;
 import com.givemepic.backend.auth.dto.UpdateProfileRequest;
@@ -36,7 +37,12 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         return withAuthCookies(authService.login(request), HttpStatus.OK);
-        }
+    }
+
+    @PostMapping("/google")
+    public ResponseEntity<AuthResponse> googleLogin(@Valid @RequestBody GoogleAuthRequest request) {
+        return withAuthCookies(authService.authenticateWithGoogle(request), HttpStatus.OK);
+    }
 
     @GetMapping("/me")
     public ResponseEntity<UserProfileResponse> me(@AuthenticationPrincipal UUID userId) {

@@ -29,6 +29,21 @@ Do you want me to commit this?
 - Build/tests are currently failing
 - The user is mid-debugging (the issue hasn't been confirmed fixed yet)
 
+## Pre-commit & Pre-push Verification (Mandatory)
+
+Never propose a commit or push without running the local verification commands corresponding to the modified modules:
+
+1. **Frontend changes (`frontend/`)**:
+   - `npm run lint` (ESLint syntax and hook checks)
+   - **MUST RUN `npm run build`** (Next.js production compilation + full TypeScript type checking — never skip, as `lint` does not run full TypeScript type checks)
+   - Playwright E2E (`npx playwright test`) if user flow, layout, or auth were touched.
+2. **Backend changes (`backend/`)**:
+   - `./mvnw test-compile` (Java compilation, type checking, and Lombok annotations)
+   - Unit/Integration tests (`./mvnw test -Dtest=...`)
+3. **Safety invariant**:
+   - If any local build/test command fails, fix the issue completely and re-verify before asking for confirmation.
+   - Never push code that hasn't passed `npm run build` and Maven compilation locally.
+
 ## Commit message format
 
 Use Conventional Commits:

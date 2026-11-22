@@ -1,6 +1,8 @@
 package com.givemepic.backend.auth.service;
 
 import com.givemepic.backend.auth.dto.AuthResponse;
+import com.givemepic.backend.auth.dto.GoogleAuthRequest;
+import com.givemepic.backend.auth.dto.GoogleTokenPayload;
 import com.givemepic.backend.auth.dto.LoginRequest;
 import com.givemepic.backend.auth.dto.RegisterRequest;
 import com.givemepic.backend.auth.dto.UserProfileResponse;
@@ -43,6 +45,9 @@ class AuthServiceTests {
 
     @Mock
     private JwtService jwtService;
+
+    @Mock
+    private GoogleTokenVerifier googleTokenVerifier;
 
     @InjectMocks
     private AuthService authService;
@@ -175,5 +180,152 @@ class AuthServiceTests {
         assertThatThrownBy(() -> authService.getProfile(userId))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasFieldOrPropertyWithValue("status", HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void authenticateWithGoogle_NewUser_CreatesUser() {
+        // Arrange
+        GoogleAuthRequest request = new GoogleAuthRequest("valid-id-token");
+        GoogleTokenPayload payload = new GoogleTokenPayload(
+                "google-sub-123",
+                "googleuser@example.com",
+                "true",
+                "Google User",
+                "https://avatar.url/pic.jpg",
+                "client-id-123",
+                "https://accounts.google.com"
+        );
+        when(googleTokenVerifier.verify("valid-id-token")).thenReturn(payload);
+        when(userRepository.findByEmailIgnoreCase("googleuser@example.com")).thenReturn(Optional.empty());
+
+        UUID newUserId = UUID.randomUUID();
+        doAnswer(invocation -> {
+            User u = invocation.getArgument(0);
+            u.setId(newUserId);
+            return u;
+        }).when(userRepository).save(any(User.class));
+
+        when(jwtService.generateAccessToken(newUserId, "googleuser@example.com")).thenReturn("access-token-xyz");
+
+        // Act
+        AuthResponse response = authService.authenticateWithGoogle(request);
+
+        // Assert
+        assertThat(response).isNotNull();
+        assertThat(response.email()).isEqualTo("googleuser@example.com");
+        assertThat(response.displayName()).isEqualTo("Google User");
+
+        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(userCaptor.capture());
+        User savedUser = userCaptor.getValue();
+        assertThat(savedUser.getProvider()).isEqualTo("google");
+        assertThat(savedUser.getProviderId()).isEqualTo("google-sub-123");
+        assertThat(savedUser.getPasswordHash()).isNull();
+        assertThat(savedUser.getAvatarUrl()).isEqualTo("https://avatar.url/pic.jpg");
+    }
+
+    @Test
+    void authenticateWithGoogle_NewUser_TruncatesLongDisplayNameAndIgnoresOversizedAvatar() {
+        // Arrange
+        String veryLongName = "A".repeat(150);
+        String veryLongAvatar = "https://example.com/" + "x".repeat(600);
+        GoogleAuthRequest request = new GoogleAuthRequest("valid-id-token");
+        GoogleTokenPayload payload = new GoogleTokenPayload(
+                "google-sub-789",
+                "LONGNAME@EXAMPLE.COM",
+                "true",
+                veryLongName,
+                veryLongAvatar,
+                "client-id-123",
+                "https://accounts.google.com"
+        );
+        when(googleTokenVerifier.verify("valid-id-token")).thenReturn(payload);
+        when(userRepository.findByEmailIgnoreCase("longname@example.com")).thenReturn(Optional.empty());
+
+        UUID newUserId = UUID.randomUUID();
+        doAnswer(invocation -> {
+            User u = invocation.getArgument(0);
+            u.setId(newUserId);
+            return u;
+        }).when(userRepository).save(any(User.class));
+
+        when(jwtService.generateAccessToken(newUserId, "longname@example.com")).thenReturn("access-token-long");
+
+        // Act
+        AuthResponse response = authService.authenticateWithGoogle(request);
+
+        // Assert
+        assertThat(response).isNotNull();
+        assertThat(response.email()).isEqualTo("longname@example.com");
+
+        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(userCaptor.capture());
+        User savedUser = userCaptor.getValue();
+        assertThat(savedUser.getDisplayName()).hasSize(100);
+        assertThat(savedUser.getAvatarUrl()).isNull(); // Exceeds 500 characters
+    }
+
+    @Test
+    void authenticateWithGoogle_ExistingUser_LinksAndSyncsAvatar() {
+        // Arrange
+        User existingUser = User.builder()
+                .id(userId)
+                .email("existing@example.com")
+                .displayName("Existing Local")
+                .passwordHash("local-hash")
+                .avatarUrl(null)
+                .provider("local")
+                .build();
+
+        GoogleAuthRequest request = new GoogleAuthRequest("valid-id-token");
+        GoogleTokenPayload payload = new GoogleTokenPayload(
+                "google-sub-456",
+                "EXISTING@EXAMPLE.COM",
+                "true",
+                "Google Display",
+                "https://new-avatar.url/pic.jpg",
+                "client-id-123",
+                "https://accounts.google.com"
+        );
+        when(googleTokenVerifier.verify("valid-id-token")).thenReturn(payload);
+        when(userRepository.findByEmailIgnoreCase("existing@example.com")).thenReturn(Optional.of(existingUser));
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(jwtService.generateAccessToken(userId, "existing@example.com")).thenReturn("access-token-existing");
+
+        // Act
+        AuthResponse response = authService.authenticateWithGoogle(request);
+
+        // Assert
+        assertThat(response).isNotNull();
+        assertThat(response.email()).isEqualTo("existing@example.com");
+
+        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(userCaptor.capture());
+        User savedUser = userCaptor.getValue();
+        assertThat(savedUser.getProvider()).isEqualTo("google");
+        assertThat(savedUser.getProviderId()).isEqualTo("google-sub-456");
+        assertThat(savedUser.getAvatarUrl()).isEqualTo("https://new-avatar.url/pic.jpg");
+        assertThat(savedUser.getPasswordHash()).isEqualTo("local-hash"); // Preserved
+    }
+
+    @Test
+    void login_ThrowsException_WhenPasswordHashIsNull() {
+        // Arrange: User signed up via Google with null passwordHash
+        User googleOnlyUser = User.builder()
+                .id(userId)
+                .email("google-only@example.com")
+                .displayName("Google User")
+                .passwordHash(null)
+                .provider("google")
+                .providerId("sub-123")
+                .build();
+        when(userRepository.findByEmail("google-only@example.com")).thenReturn(Optional.of(googleOnlyUser));
+
+        LoginRequest request = new LoginRequest("google-only@example.com", "any-password");
+
+        // Act & Assert
+        assertThatThrownBy(() -> authService.login(request))
+                .isInstanceOf(BadCredentialsException.class)
+                .hasMessage("Email hoặc mật khẩu không đúng");
     }
 }
