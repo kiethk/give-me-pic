@@ -180,13 +180,13 @@ export async function createSubject(payload: CreateSubjectInput) {
     });
 }
 
-export interface UpdateSubjectInput {
+export type UpdateSubjectInput = {
     name: string;
     description?: string;
     colorHex?: string;
     semester?: string;
     archived?: boolean;
-}
+};
 
 export async function updateSubject(id: string, payload: UpdateSubjectInput) {
     return request<Subject>(`/api/subjects/${id}`, {
@@ -327,7 +327,7 @@ async function request<T>(
     options: {
         method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 
-        body?: Record<string, unknown>;
+        body?: unknown;
     },
 ): Promise<T> {
     const response = await fetch(`${path}`, {
