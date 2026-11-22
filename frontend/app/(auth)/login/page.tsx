@@ -20,7 +20,7 @@ export default function LoginPage() {
 
     try {
       await login({ email, password });
-      router.push("/dashboard");
+      router.push("/dashboard/chat");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Đã có lỗi xảy ra.");
     } finally {

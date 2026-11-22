@@ -3,9 +3,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getProfile, logout, UserProfile } from "@/lib/api-client";
 import { BottomSheet } from "@/components/BottomSheet";
+import { setPendingUploadFiles } from "@/lib/pending-upload-store";
 
 // ── Icons (inline SVG, no extra dependency) ──────────────────────────────────
 function IconGrid({ active }: { active: boolean }) {
@@ -30,6 +31,14 @@ function IconChat({ active }: { active: boolean }) {
         </svg>
     );
 }
+function IconCamera({ className = "w-6 h-6" }: { className?: string }) {
+    return (
+        <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+            <circle cx="12" cy="13" r="4"/>
+        </svg>
+    );
+}
 function IconSettings({ active }: { active: boolean }) {
     return (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={active ? "#0050cb" : "#727687"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -38,10 +47,22 @@ function IconSettings({ active }: { active: boolean }) {
     );
 }
 
+function inferMimeType(fileName: string, currentType?: string): string {
+    if (currentType && currentType.startsWith("image/")) {
+        return currentType;
+    }
+    const lower = fileName.toLowerCase();
+    if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+    if (lower.endsWith(".png")) return "image/png";
+    if (lower.endsWith(".webp")) return "image/webp";
+    if (lower.endsWith(".heic")) return "image/heic";
+    return currentType || "";
+}
+
 const navLinks = [
-    { href: "/dashboard", label: "Subjects",   Icon: IconGrid },
-    { href: "/dashboard/upload", label: "Upload",     Icon: IconUpload },
     { href: "/dashboard/chat",   label: "Ask AI",     Icon: IconChat },
+    { href: "/dashboard",        label: "Subjects",   Icon: IconGrid },
+    { href: "/dashboard/upload", label: "Upload",     Icon: IconUpload },
     { href: "/dashboard/settings", label: "Settings", Icon: IconSettings },
 ];
 
@@ -50,6 +71,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const router = useRouter();
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [showProfileSheet, setShowProfileSheet] = useState(false);
+    const [showCaptureSheet, setShowCaptureSheet] = useState(false);
+
+    const cameraInputRef = useRef<HTMLInputElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         getProfile()
@@ -64,8 +89,48 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     // Determine active nav
     function isActive(href: string) {
-        if (href === "/dashboard") return pathname === "/dashboard";
+        if (href === "/dashboard") return pathname === "/dashboard" || pathname.startsWith("/dashboard/subjects");
         return pathname.startsWith(href);
+    }
+
+    function handleFilesSelected(event: React.ChangeEvent<HTMLInputElement>) {
+        const files = event.target.files;
+        if (!files || files.length === 0) return;
+
+        const rawFiles = Array.from(files);
+        const normalizedFiles = rawFiles.map((file, idx) => {
+            let fileName = file.name;
+            const lowerName = fileName.toLowerCase();
+            if (lowerName === "image.jpg" || lowerName === "image.jpeg") {
+                const ext = lowerName.endsWith(".jpeg") ? "jpeg" : "jpg";
+                fileName = `photo_${Date.now()}_${idx}.${ext}`;
+            }
+
+            const fileType = inferMimeType(fileName, file.type);
+            if (fileName !== file.name || fileType !== file.type) {
+                return new File([file], fileName, { type: fileType, lastModified: file.lastModified });
+            }
+            return file;
+        });
+
+        const validFiles = normalizedFiles.filter((f) => {
+            return (
+                f.type.startsWith("image/") ||
+                f.name.toLowerCase().endsWith(".jpg") ||
+                f.name.toLowerCase().endsWith(".jpeg") ||
+                f.name.toLowerCase().endsWith(".png") ||
+                f.name.toLowerCase().endsWith(".webp") ||
+                f.name.toLowerCase().endsWith(".heic")
+            );
+        });
+
+        if (validFiles.length > 0) {
+            setPendingUploadFiles(validFiles);
+            setShowCaptureSheet(false);
+            router.push("/dashboard/upload");
+        }
+
+        event.target.value = "";
     }
 
     return (
@@ -210,30 +275,98 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     </div>
                 </BottomSheet>
 
+                {/* Hidden File / Camera Inputs for Mobile FAB */}
+                <input
+                    ref={cameraInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={handleFilesSelected}
+                />
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={handleFilesSelected}
+                />
+
+                {/* Mobile Capture / Upload Options Sheet */}
+                <BottomSheet
+                    open={showCaptureSheet}
+                    onClose={() => setShowCaptureSheet(false)}
+                    title="Thêm bài học mới"
+                >
+                    <div className="space-y-3 px-5 py-4 pb-6">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                cameraInputRef.current?.click();
+                            }}
+                            className="flex w-full items-center gap-4 rounded-2xl border border-[#c2c6d8] bg-white p-4 text-left shadow-sm transition hover:bg-[#f0f3ff] active:scale-[0.98]"
+                        >
+                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#e7eeff] text-[#0050cb]">
+                                <IconCamera className="h-6 w-6" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <p className="text-[15px] font-semibold text-[#111c2d]">Chụp ảnh ngay</p>
+                                <p className="text-xs text-[#727687]">Mở máy ảnh chụp trực tiếp bảng viết hoặc bài giảng</p>
+                            </div>
+                            <svg className="h-5 w-5 shrink-0 text-[#727687]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <polyline points="9 18 15 12 9 6" />
+                            </svg>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => {
+                                fileInputRef.current?.click();
+                            }}
+                            className="flex w-full items-center gap-4 rounded-2xl border border-[#c2c6d8] bg-white p-4 text-left shadow-sm transition hover:bg-[#f0f3ff] active:scale-[0.98]"
+                        >
+                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#e7eeff] text-[#0050cb]">
+                                <IconUpload active={true} />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <p className="text-[15px] font-semibold text-[#111c2d]">Chọn từ thư viện</p>
+                                <p className="text-xs text-[#727687]">Tải lên một hoặc nhiều ảnh đã có sẵn trong máy</p>
+                            </div>
+                            <svg className="h-5 w-5 shrink-0 text-[#727687]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <polyline points="9 18 15 12 9 6" />
+                            </svg>
+                        </button>
+                    </div>
+                </BottomSheet>
+
                 {/* Page content */}
                 <main className="flex-1 overflow-y-auto">
                     {children}
                 </main>
 
                 {/* Mobile Bottom Navigation */}
-                <nav className="md:hidden shrink-0 h-[72px] bg-white border-t border-[#e2e8f0] flex items-center justify-around px-2 pb-[env(safe-area-inset-bottom)] z-50">
-                    <Link href="/dashboard" className="flex flex-col items-center gap-1 p-2 text-[#727687] min-w-[64px]">
-                        <IconGrid active={isActive('/dashboard')} />
-                        <span className={`text-[10px] font-medium ${isActive('/dashboard') ? 'text-[#0050cb]' : ''}`}>Subjects</span>
+                <nav className="md:hidden shrink-0 h-[72px] bg-white border-t border-[#e2e8f0] flex items-center justify-around px-4 pb-[env(safe-area-inset-bottom)] z-40">
+                    <Link href="/dashboard/chat" className="flex flex-col items-center gap-1 p-2 text-[#727687] min-w-[64px]">
+                        <IconChat active={isActive('/dashboard/chat')} />
+                        <span className={`text-[10px] font-medium ${isActive('/dashboard/chat') ? 'text-[#0050cb]' : ''}`}>Hỏi AI</span>
                     </Link>
 
                     {/* Camera FAB */}
                     <div className="relative -top-5">
-                        <Link href="/dashboard/upload" className="flex h-14 w-14 items-center justify-center rounded-full bg-[#0050cb] shadow-[0_8px_16px_rgba(0,80,203,0.3)] text-white hover:bg-[#0066ff] transition-transform active:scale-95">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
-                            </svg>
-                        </Link>
+                        <button
+                            type="button"
+                            onClick={() => setShowCaptureSheet(true)}
+                            aria-label="Chụp ảnh hoặc tải lên"
+                            className="flex h-14 w-14 items-center justify-center rounded-full bg-[#0050cb] shadow-[0_8px_16px_rgba(0,80,203,0.3)] text-white hover:bg-[#0066ff] transition-transform active:scale-95"
+                        >
+                            <IconCamera className="w-7 h-7" />
+                        </button>
                     </div>
 
-                    <Link href="/dashboard/chat" className="flex flex-col items-center gap-1 p-2 text-[#727687] min-w-[64px]">
-                        <IconChat active={isActive('/dashboard/chat')} />
-                        <span className={`text-[10px] font-medium ${isActive('/dashboard/chat') ? 'text-[#0050cb]' : ''}`}>Ask AI</span>
+                    <Link href="/dashboard" className="flex flex-col items-center gap-1 p-2 text-[#727687] min-w-[64px]">
+                        <IconGrid active={isActive('/dashboard')} />
+                        <span className={`text-[10px] font-medium ${isActive('/dashboard') ? 'text-[#0050cb]' : ''}`}>Môn học</span>
                     </Link>
                 </nav>
             </div>

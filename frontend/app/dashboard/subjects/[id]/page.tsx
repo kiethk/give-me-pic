@@ -405,7 +405,7 @@ export default function SubjectDetailPage() {
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="flex items-center justify-between border-b border-[#e2e8f0] px-5 py-3">
-                            <p className="text-sm font-semibold text-[#111c2d] truncate max-w-[200px] md:max-w-md">{previewMedia.fileName}</p>
+                            <p className="text-sm font-semibold text-[#111c2d] truncate max-w-[200px] md:max-w-md">{previewMedia.caption || "Photo preview"}</p>
                             <button onClick={() => setPreviewMedia(null)} className="text-[#727687] hover:text-[#111c2d] transition-colors rounded-full p-1 hover:bg-[#f0f3ff]">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -416,7 +416,7 @@ export default function SubjectDetailPage() {
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                                 src={previewMedia.url}
-                                alt={previewMedia.fileName}
+                                alt={previewMedia.caption || "Photo"}
                                 className="max-h-[75vh] object-contain rounded-lg shadow-sm"
                             />
                         </div>

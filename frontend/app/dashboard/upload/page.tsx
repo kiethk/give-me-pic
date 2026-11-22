@@ -4,6 +4,7 @@ import { ChangeEvent, DragEvent, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { createSubject, getSubjects, suggestSubject, Subject } from "@/lib/api-client";
 import { useUploadQueue } from "@/lib/use-upload-queue";
+import { consumePendingUploadFiles, subscribePendingUploadFiles } from "@/lib/pending-upload-store";
 
 function Thumbnail({ buffer, type, alt }: { buffer: ArrayBuffer; type: string; alt: string }) {
     const [url, setUrl] = useState("");
@@ -165,6 +166,24 @@ export default function UploadPage() {
         });
     }
 
+    useEffect(() => {
+        const pending = consumePendingUploadFiles();
+        if (pending.length > 0) {
+            handleIncomingFiles(pending);
+        }
+
+        const unsubscribe = subscribePendingUploadFiles((files) => {
+            if (files.length > 0) {
+                const consumed = consumePendingUploadFiles();
+                if (consumed.length > 0) {
+                    handleIncomingFiles(consumed);
+                }
+            }
+        });
+
+        return unsubscribe;
+    }, []);
+
     async function handleStartUpload() {
         if (stagedFiles.length === 0) return;
 
@@ -199,7 +218,7 @@ export default function UploadPage() {
         try {
             for (const item of stagedFiles) {
                 if (item.file.size > 20 * 1024 * 1024) {
-                    alert(`Warning: ${item.file.name} is larger than 20MB. Upload might fail.`);
+                    alert("Warning: An image is larger than 20MB. Upload might fail.");
                 }
                 await addToQueue(targetSubjectId, item.file, item.buffer, caption || undefined);
             }
@@ -340,7 +359,7 @@ export default function UploadPage() {
                             <div key={idx} className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-[#e2e8f0] bg-[#f9f9ff]">
                                 <Image
                                     src={item.previewUrl}
-                                    alt={item.file.name}
+                                    alt={caption || "Staged photo"}
                                     fill
                                     unoptimized
                                     className="object-cover"
@@ -463,35 +482,38 @@ export default function UploadPage() {
                 <div className="mt-6">
                     <p className="text-sm font-semibold text-[#424656]">Uploading ({uploading.length})</p>
                     <div className="mt-3 space-y-3">
-                        {uploading.map((item) => (
-                            <div key={item.clientUploadId} className="flex items-center gap-3 rounded-xl border border-[#e2e8f0] bg-white p-3">
-                                <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-[#e7eeff]">
-                                    <Thumbnail buffer={item.fileBuffer} type={item.fileType} alt={item.fileName} />
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm font-medium text-[#111c2d]">{item.fileName}</p>
-                                    <div className="mt-1.5 h-1.5 w-full rounded-full bg-[#e7eeff]">
-                                        <div
-                                            className={`h-full rounded-full bg-[#0050cb] transition-all ${item.status === "uploading" ? "w-3/4" : "w-0"}`}
-                                        />
+                        {uploading.map((item, idx) => {
+                            const displayName = item.caption?.trim() || (uploading.length > 1 ? `Photo ${idx + 1}` : "Photo");
+                            return (
+                                <div key={item.clientUploadId} className="flex items-center gap-3 rounded-xl border border-[#e2e8f0] bg-white p-3">
+                                    <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-[#e7eeff]">
+                                        <Thumbnail buffer={item.fileBuffer} type={item.fileType} alt={displayName} />
                                     </div>
-                                    <p className="mt-1 text-[11px] text-[#727687]">
-                                        {item.status === "uploading" ? "Uploading…" : "Waiting for connection"}
-                                    </p>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="truncate text-sm font-medium text-[#111c2d]">{displayName}</p>
+                                        <div className="mt-1.5 h-1.5 w-full rounded-full bg-[#e7eeff]">
+                                            <div
+                                                className={`h-full rounded-full bg-[#0050cb] transition-all ${item.status === "uploading" ? "w-3/4" : "w-0"}`}
+                                            />
+                                        </div>
+                                        <p className="mt-1 text-[11px] text-[#727687]">
+                                            {item.status === "uploading" ? "Uploading…" : "Waiting for connection"}
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => removeItem(item.clientUploadId)}
+                                        title="Cancel upload"
+                                        aria-label="Cancel upload"
+                                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[#727687] hover:bg-[#f0f3ff] hover:text-[#ba1a1a] transition-colors"
+                                    >
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                                        </svg>
+                                    </button>
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={() => removeItem(item.clientUploadId)}
-                                    title="Cancel upload"
-                                    aria-label="Cancel upload"
-                                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[#727687] hover:bg-[#f0f3ff] hover:text-[#ba1a1a] transition-colors"
-                                >
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                                    </svg>
-                                </button>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
             )}
@@ -519,28 +541,31 @@ export default function UploadPage() {
                         </div>
                     </div>
                     <div className="mt-3 space-y-2">
-                        {failed.map((item) => (
-                            <div key={item.clientUploadId} className="flex items-center gap-3 rounded-xl border border-[#ffdad6] bg-[#fff5f5] px-3 py-2.5">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ba1a1a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-                                    <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
-                                </svg>
-                                <p className="min-w-0 flex-1 truncate text-sm text-[#93000a]">{item.fileName}</p>
-                                {item.errorMessage && (
-                                    <span className="shrink-0 text-xs text-[#727687] max-w-[150px] truncate" title={item.errorMessage}>{item.errorMessage}</span>
-                                )}
-                                <button
-                                    type="button"
-                                    onClick={() => removeItem(item.clientUploadId)}
-                                    title="Dismiss"
-                                    aria-label="Dismiss failed upload"
-                                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-[#93000a] hover:bg-[#ffdad6]/60 transition-colors"
-                                >
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                        {failed.map((item, idx) => {
+                            const displayName = item.caption?.trim() || (failed.length > 1 ? `Photo ${idx + 1}` : "Photo");
+                            return (
+                                <div key={item.clientUploadId} className="flex items-center gap-3 rounded-xl border border-[#ffdad6] bg-[#fff5f5] px-3 py-2.5">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ba1a1a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                                        <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
                                     </svg>
-                                </button>
-                            </div>
-                        ))}
+                                    <p className="min-w-0 flex-1 truncate text-sm text-[#93000a]">{displayName}</p>
+                                    {item.errorMessage && (
+                                        <span className="shrink-0 text-xs text-[#727687] max-w-[150px] truncate" title={item.errorMessage}>{item.errorMessage}</span>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => removeItem(item.clientUploadId)}
+                                        title="Dismiss"
+                                        aria-label="Dismiss failed upload"
+                                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-[#93000a] hover:bg-[#ffdad6]/60 transition-colors"
+                                    >
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             )}

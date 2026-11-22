@@ -1,7 +1,11 @@
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-export default function HomePage() {
-  // Currently, Give Me Pic has no public landing page.
-  // We redirect users directly to the login flow.
+export default async function HomePage() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("access_token");
+  if (token) {
+    redirect("/dashboard/chat");
+  }
   redirect("/login");
 }

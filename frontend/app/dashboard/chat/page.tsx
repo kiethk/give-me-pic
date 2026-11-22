@@ -430,7 +430,7 @@ export default function ChatPage() {
                                                 <div className="mt-3 border-t border-[#e2e8f0] pt-3">
                                                     <p className="text-[11px] font-semibold uppercase tracking-wider text-[#727687]">Sources</p>
                                                     <div className="mt-2 flex flex-wrap gap-2">
-                                                        {message.citations.map((citation) => (
+                                                        {message.citations.map((citation, idx) => (
                                                             <button
                                                                 key={citation.chunkId}
                                                                 type="button"
@@ -439,14 +439,14 @@ export default function ChatPage() {
                                                             >
                                                                 <Image
                                                                     src={citation.imageUrl}
-                                                                    alt={citation.fileName}
+                                                                    alt={`Source ${idx + 1}`}
                                                                     width={24}
                                                                     height={24}
                                                                     unoptimized
                                                                     className="h-6 w-6 rounded object-cover"
                                                                 />
                                                                 <span className="max-w-[110px] truncate text-xs font-medium text-[#424656]">
-                                                                    {citation.fileName}
+                                                                    Source {idx + 1}
                                                                 </span>
                                                             </button>
                                                         ))}
@@ -502,7 +502,7 @@ export default function ChatPage() {
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="flex items-center justify-between border-b border-[#e2e8f0] px-5 py-3">
-                            <p className="truncate text-sm font-semibold text-[#111c2d]">{previewCitation.fileName}</p>
+                            <p className="truncate text-sm font-semibold text-[#111c2d]">Source photo</p>
                             <button onClick={() => setPreviewCitation(null)} className="text-[#727687] hover:text-[#111c2d] transition-colors">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -513,7 +513,7 @@ export default function ChatPage() {
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                                 src={previewCitation.imageUrl}
-                                alt={previewCitation.fileName}
+                                alt="Source photo"
                                 className="max-h-[65vh] rounded-lg object-contain"
                             />
                         </div>

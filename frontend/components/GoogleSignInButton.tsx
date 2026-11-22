@@ -94,7 +94,7 @@ export default function GoogleSignInButton({
         if (onSuccess) {
           onSuccess();
         } else {
-          router.push("/dashboard");
+          router.push("/dashboard/chat");
         }
       } catch (err) {
         onError?.(err instanceof Error ? err.message : "Đăng nhập với Google thất bại.");

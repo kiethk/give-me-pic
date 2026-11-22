@@ -21,7 +21,7 @@ export default function RegisterPage() {
 
     try {
       await register({ email, password, displayName });
-      router.push("/dashboard");
+      router.push("/dashboard/chat");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Đã có lỗi xảy ra.");
     } finally {
