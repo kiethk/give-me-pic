@@ -4,43 +4,52 @@
 
 [![CI Pipeline](https://github.com/kiethk/give-me-pic/actions/workflows/ci.yml/badge.svg)](https://github.com/kiethk/give-me-pic/actions/workflows/ci.yml)
 [![Production Deploy](https://github.com/kiethk/give-me-pic/actions/workflows/deploy.yml/badge.svg)](https://github.com/kiethk/give-me-pic/actions/workflows/deploy.yml)
-[![Next.js](https://img.shields.io/badge/Frontend-Next.js%2015%20(App%20Router)-black?logo=next.js)](https://nextjs.org/)
+[![Next.js](<https://img.shields.io/badge/Frontend-Next.js%2015%20(App%20Router)-black?logo=next.js>)](https://nextjs.org/)
 [![Spring Boot](https://img.shields.io/badge/Backend-Spring%20Boot%203.4%20%2F%20Java%2021-brightgreen?logo=springboot)](https://spring.io/projects/spring-boot)
 [![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL%20%2B%20pgvector-blue?logo=postgresql)](https://github.com/pgvector/pgvector)
 [![Gemini](https://img.shields.io/badge/AI%20Engine-Google%20Gemini%20API-orange?logo=google)](https://ai.google.dev/)
 
 ---
 
-## 📌 Executive Summary & Business Context
+## 📌 Executive Summary & Problem Statement
 
-University students and self-learners routinely capture hundreds of lecture slides, whiteboard notes, and textbook diagrams on their smartphones. However, this visual data remains trapped in unstructured camera rolls—unsearchable, difficult to review, and impossible to query quickly during exam preparation.
+Students and self-learners capture hundreds of whiteboard photos, textbook pages, and presentation slides throughout an academic semester. However, this critical visual information remains trapped in disorganized smartphone galleries—unindexed, unsearchable, and difficult to reference during revision.
 
-**Give Me Pic** bridges this gap as an **offline-first, mobile-optimized PWA**. It automatically extracts text, formulas, and diagrams via multimodal OCR, indexes content with vector embeddings, and delivers an AI tutor capable of synthesizing answers while citing the exact photo sources.
+**Give Me Pic** solves this challenge with an **offline-first Progressive Web App (PWA)** backed by an end-to-end Multimodal RAG architecture:
+
+1. **Capture & Ingestion**: Upload or photograph study materials directly from mobile or desktop.
+2. **Multimodal Extraction**: Transcribes handwritten text, complex diagrams, and formulas via Google Gemini Vision OCR.
+3. **Semantic Indexing**: Chunks text and generates 768-dimensional dense vector embeddings stored in PostgreSQL via `pgvector`.
+4. **Citation-Backed Synthesis**: Delivers an interactive AI tutor that synthesizes contextual answers with verifiable links directly referencing the original source photographs.
 
 ---
 
-## 🚀 Key Features & Capabilities
+## 🚀 Key Features
 
 ### 1. Multimodal RAG & Grounded Q&A
-- **Vision-Driven OCR Pipeline**: Processes raw lecture photos (whiteboards, handwritten notes, printed slides) via Gemini Multimodal API to extract high-accuracy text and mathematical markdown.
-- **Vector Search with `pgvector`**: Chunks OCR outputs and computes 768-dimensional dense embeddings (`text-embedding-004`), stored in PostgreSQL for cosine-similarity semantic search.
-- **Citation-Backed Answers**: Every assistant response includes verifiable citations linking directly to the specific source photo and chunk index.
-- **Subject-Scoped Context**: Filter queries across all enrolled subjects or isolate retrieval to a specific course.
 
-### 2. Enterprise Authentication & Security
-- **Dual-Mode Auth**: Standard credentials (BCrypt password hashing) and native **Google OAuth 2.0** with Google Identity Services (GIS).
-- **Stateless JWT + Rotating HttpOnly Cookies**: 15-minute access tokens with hardened HTTP-only refresh tokens stored in PostgreSQL (`refresh_tokens`), preventing XSS and CSRF token theft.
-- **Granular User Profiles**: Self-service profile management, avatars, and persistent storage quota tracking.
+- **Vision-Driven OCR Pipeline**: Automatically transcribes handwritten whiteboard notes, equations, and slide diagrams using the Gemini Multimodal API.
+- **Vector Search with `pgvector`**: Chunks OCR outputs and computes 768-dimensional dense vector embeddings (`gemini-embedding-001`), performing cosine similarity retrieval directly in PostgreSQL.
+- **Citation-Backed Answers**: Every assistant answer generates verifiable citations pointing back to the specific source photo and chunk index.
+- **Course & Subject Filtering**: Search queries across all subjects or constrain context to a specific course.
 
-### 3. Progressive Web App (PWA) & Mobile-First UX
+### 2. Enterprise Authentication & Session Security
+
+- **Dual-Mode Auth**: Standard credentials (BCrypt password hashing) alongside native **Google OAuth 2.0** (Google Identity Services popup).
+- **Stateless JWT + Rotating HttpOnly Refresh Cookies**: 15-minute access tokens paired with rotating refresh tokens stored in PostgreSQL (`refresh_tokens`), preventing XSS and CSRF token exposure.
+- **User Profile Management**: Self-service profile updates, custom avatars, and persistent storage quota tracking.
+
+### 3. Progressive Web App (PWA) & Mobile UX
+
 - **Installable PWA**: Standalone mobile experience with service worker caching via `@ducanh2912/next-pwa`.
-- **Direct Camera Capture**: In-app camera integration and multi-file picker with automatic HEIC/JPEG normalization.
+- **Direct Camera Capture**: Native camera integration and multi-file picker with automatic HEIC/JPEG format normalization.
 - **Resilient Upload Queue**: Background queue with auto-retry, offline detection, recovery mechanisms, and dismissible state.
-- **iOS Viewport Optimization**: Minimum 16px form inputs and viewport restrictions preventing unwanted Safari auto-zoom.
+- **iOS Viewport Optimization**: Minimum 16px form inputs and viewport restrictions preventing Safari auto-zoom shifts.
 
 ### 4. Modern Desktop & Adaptive Dashboard
-- **Sleek Top Navigation**: High-density desktop topbar with clean typography, flush active indicator tabs, and quick-action user menu (Vercel/Linear design principles).
-- **Dedicated Chat History Sidebar**: Single left sidebar in `Ask AI` view for frictionless conversation switching without visual clutter.
+
+- **Sleek Top Navigation**: High-density desktop topbar with clean typography, flush active indicator tabs, and quick-action user menu.
+- **Dedicated Chat History Sidebar**: Single left sidebar in `Ask AI` view for frictionless conversation switching without layout clutter.
 
 ---
 
@@ -68,49 +77,43 @@ University students and self-learners routinely capture hundreds of lecture slid
                     └─────┬─────┴──────┬───────┴─────────┬─────────┘
                           │            │                 │
               ┌───────────┴────┐  ┌────┴────────────┐  ┌─┴────────────────┐
-              │ PostgreSQL 16  │  │  S3 / MinIO     │  │ Google Gemini    │
-              │  + pgvector    │  │  Object Storage │  │ Multimodal API   │
-              │  Flyway (V1-11)│  │  (Lecture Docs) │  │ OCR + Embeddings │
+              │ PostgreSQL 16  │  │ Supabase Storage│  │ Google Gemini    │
+              │  + pgvector    │  │ (S3-compatible) │  │ Multimodal API   │
+              │  Flyway (V1-11)│  │ (Lecture Photos)│  │ OCR + Embeddings │
               └────────────────┘  └─────────────────┘  └──────────────────┘
 ```
 
 ### Module Breakdown (Spring Boot Modular Monolith)
-- `com.givemepic.backend.auth`: User registration, login, JWT issuance, Google ID token verification, refresh token rotation.
-- `com.givemepic.backend.subject`: Subject lifecycle management (CRUD, colors, semester tagging).
-- `com.givemepic.backend.media`: Multipart file upload, MinIO/S3 storage integration, async OCR trigger.
-- `com.givemepic.backend.chat`: Vector search, Gemini RAG orchestration, citation mapping, chat session history.
+
+- `com.givemepic.backend.auth`: User registration, login, JWT issuance, Google ID token verification, and refresh token rotation.
+- `com.givemepic.backend.subject`: Subject lifecycle management (CRUD, color tagging, semester categorization).
+- `com.givemepic.backend.media`: Multipart file upload, Supabase S3-compatible storage integration, presigned URLs, and async OCR triggers.
+- `com.givemepic.backend.chat`: Vector search orchestration, Gemini RAG prompts, citation resolution, and chat session history.
 - `com.givemepic.backend.common`: Global exception handling, security filters, rate limiting, and shared DTOs.
 
 ---
 
 ## 🛠️ Technology Stack
 
-| Layer | Technology | Details |
-|---|---|---|
-| **Backend** | Spring Boot 3.4 (Java 21) | Modular Monolith, Spring Security, Spring Data JPA, RestClient |
-| **Database** | PostgreSQL 16 + `pgvector` | Cosine vector similarity search (768-dim), Flyway migrations (V1–V11) |
-| **Object Storage** | MinIO (Local) / AWS S3 (Prod) | Secure photo storage with pre-signed URLs and mime normalization |
-| **AI / LLM** | Google Gemini 1.5 & Embedding | Vision OCR, `text-embedding-004` (768d), conversational RAG generation |
-| **Frontend** | Next.js 15 (React 19) | App Router, TypeScript, Tailwind CSS, `@ducanh2912/next-pwa` |
-| **Authentication** | JWT + Google OAuth 2.0 | HttpOnly secure cookies, access token memory storage, refresh token table |
-| **DevOps / CI-CD** | GitHub Actions | Automated Maven + Postgres service tests, Next.js lint/build, Vercel & Render deploy |
+| Layer              | Technology                       | Key Capabilities                                                                                                                |
+| ------------------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| **Backend**        | Spring Boot 3.4 · Java 21        | Modular Monolith, Spring Security, Spring Data JPA, RestClient                                                                  |
+| **Database**       | PostgreSQL 16 + `pgvector`       | Cosine vector similarity search (768-dim), Flyway migrations (V1–V11)                                                           |
+| **Object Storage** | Supabase Storage (S3-compatible) | Secure photo storage with pre-signed URLs, bucket policies, and MIME normalization                                              |
+| **AI / LLM**       | Google Gemini API                | Multimodal Vision OCR (`gemini-3.1-flash-lite`), dense embeddings (`gemini-embedding-001`, 768d), conversational RAG generation |
+| **Frontend**       | Next.js 15 (React 19)            | App Router, TypeScript, Tailwind CSS, `@ducanh2912/next-pwa`                                                                    |
+| **Authentication** | JWT + Google OAuth 2.0           | HttpOnly secure cookies, access token memory storage, database refresh token rotation                                           |
+| **DevOps / CI-CD** | GitHub Actions                   | Automated Maven + Postgres service tests, Next.js lint/build, Vercel & Render deploy                                            |
 
 ---
 
-## 💼 CV / Resume Highlights (For Software Engineering & Fullstack Roles)
+## ⚡ Engineering Highlights & Technical Decisions
 
-If you are featuring this project on your CV or LinkedIn profile, here are ready-to-use achievement bullet points:
-
-- **Fullstack & RAG Architecture**:
-  > *"Architected and built an end-to-end Multimodal RAG platform using Spring Boot 3.4 (Java 21), Next.js 15, and PostgreSQL `pgvector`, indexing visual lecture photos and providing AI Q&A with exact source citations."*
-- **Vector Search & AI Integration**:
-  > *"Engineered an automated ingestion pipeline utilizing Google Gemini Multimodal API for whiteboard/handwritten OCR, chunking text, and computing 768-dimensional embeddings for low-latency cosine similarity retrieval."*
-- **Enterprise-Grade Security**:
-  > *"Implemented dual authentication with BCrypt and Google OAuth 2.0, utilizing short-lived stateless JWTs and rotating HttpOnly refresh tokens in PostgreSQL to eliminate XSS/CSRF exposure."*
-- **Offline-First PWA & Mobile UX**:
-  > *"Developed an installable PWA with Next.js App Router and service workers, featuring native camera capture, resilient offline upload queues with auto-recovery, and adaptive desktop/mobile navigation."*
-- **Automated CI/CD & Cloud Infrastructure**:
-  > *"Configured GitHub Actions CI/CD with containerized PostgreSQL service integration tests, Flyway database versioning (11 migrations), and automated production deployments to Render and Vercel."*
+- **Multimodal RAG Ingestion Pipeline**: Decoupled asynchronous processing flow where photo uploads trigger background OCR with Gemini Vision, followed by semantic chunking and 768-dimensional dense vector generation stored in PostgreSQL `pgvector`.
+- **Stateless Auth with Database-Backed Refresh Tokens**: Mitigated XSS and CSRF risks by combining short-lived in-memory access tokens with HttpOnly rotated refresh tokens persisted in PostgreSQL with revocation support.
+- **Resilient Offline-First Upload Queue**: Implemented client-side queueing with localStorage persistence, automatic retry with backoff, and HEIC-to-JPEG normalization to ensure reliable photo submission over unstable campus networks.
+- **Clean Modular Architecture**: Organized backend by business domain boundaries (`auth`, `subject`, `media`, `chat`) to prevent spaghetti dependencies while maintaining the operational simplicity of a single deployable artifact.
+- **Zero-Downtime Database Migration**: Versioned database evolutions managed via 11 sequential Flyway migrations, ensuring predictable schema updates across staging and production environments.
 
 ---
 
@@ -134,49 +137,58 @@ message_citations (id, message_id, chunk_id, media_id, similarity_score)
 ## 💻 Local Development Setup
 
 ### Prerequisites
-- **Docker & Docker Compose**
+
+- **Docker & Docker Compose** (for local PostgreSQL with `pgvector`)
 - **Java 21 (JDK)**
 - **Node.js 20+ & npm**
 - **Google Gemini API Key** ([Get here](https://aistudio.google.com/))
 
 ### 1. Clone & Environment Configuration
+
 ```bash
 git clone https://github.com/kiethk/give-me-pic.git
 cd give-me-pic
 ```
 
 Create `backend/src/main/resources/application-local.yml` (or set environment variables):
+
 ```yaml
 gemini:
   api-key: ${GEMINI_API_KEY}
 ```
 
 Create `frontend/.env.local`:
+
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:8080
 NEXT_PUBLIC_GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
 ```
 
-### 2. Start Supporting Services (PostgreSQL + MinIO)
+### 2. Start Supporting Services (PostgreSQL + pgvector)
+
 ```bash
 docker compose up -d
 ```
-- PostgreSQL with `pgvector`: `localhost:5432` (db: `givemepic_db`, user: `givemepic`, pass: `secret`)
-- MinIO S3 Console: `http://localhost:9001` (user: `minioadmin`, pass: `minioadmin`)
+
+- PostgreSQL with `pgvector`: `localhost:5432` (db: `givemepic`, user: `givemepic`, pass: `givemepic_dev_password`)
 
 ### 3. Launch Backend
+
 ```bash
 cd backend
 ./mvnw spring-boot:run
 ```
+
 Backend API starts at `http://localhost:8080`. Flyway automatically executes migrations `V1` to `V11`.
 
 ### 4. Launch Frontend
+
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
+
 Open `http://localhost:3000` in your browser.
 
 ---
@@ -194,14 +206,4 @@ npm run lint
 npm run build
 ```
 
----
 
-## 📈 Roadmap & Next Phases
-
-- [x] **Phase 1**: Authentication (Email + Google OAuth) & Media Storage MVP
-- [x] **Phase 2**: Multimodal RAG Pipeline (Gemini OCR, pgvector similarity, Chat with Citations)
-- [x] **Phase 3**: Reliability & Offline Queue (PWA, Service Worker, Upload Resiliency)
-- [x] **Phase 4**: UX Polish (SaaS Topbar, Clean Typography, Mobile Sheet Optimizations)
-- [ ] **Phase 5**: Stripe/Payment Subscription Tiers (`subscriptions`, `usage_monthly`)
-- [ ] **Phase 6**: HNSW Vector Indexing & Real-time Websocket Streaming
-- [ ] **Phase 7**: Native Mobile Application (React Native / Flutter)
