@@ -48,6 +48,9 @@ jobs:
       - name: Make mvnw executable
         run: chmod +x ./mvnw
 
+      - name: Enable pgvector extension
+        run: PGPASSWORD=postgres psql -h 127.0.0.1 -p 5432 -U postgres -d givemepic_test -c "CREATE EXTENSION IF NOT EXISTS vector;"
+
       - name: Build & run tests
         run: ./mvnw verify -B -Dspring.datasource.url=jdbc:postgresql://localhost:5432/givemepic_test -Dspring.datasource.username=postgres -Dspring.datasource.password=postgres
         env:
