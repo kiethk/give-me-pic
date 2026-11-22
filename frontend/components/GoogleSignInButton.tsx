@@ -175,7 +175,7 @@ export default function GoogleSignInButton({
                 type="button"
                 onClick={handleCustomClick}
                 disabled={isLoading}
-                className="flex h-11 w-full items-center justify-center gap-3 rounded-xl border border-[#c2c6d8] bg-white px-4 text-sm font-medium text-[#111c2d] shadow-sm transition hover:bg-[#f9f9ff] active:bg-[#f0f3ff] disabled:opacity-60"
+                className="flex h-11 w-full items-center justify-center gap-3 rounded-2xl border border-[#c2c6d8] bg-white px-4 text-sm font-medium text-[#111c2d] shadow-sm transition hover:bg-[#f9f9ff] active:bg-[#f0f3ff] disabled:opacity-60"
               >
                 <GoogleIcon className="h-5 w-5 shrink-0" />
                 <span>{labelText}</span>
@@ -188,7 +188,7 @@ export default function GoogleSignInButton({
             data-testid="google-signin-btn"
             onClick={handleCustomClick}
             disabled={isLoading}
-            className="flex h-11 w-full items-center justify-center gap-3 rounded-xl border border-[#c2c6d8] bg-white px-4 text-sm font-medium text-[#111c2d] shadow-sm transition hover:bg-[#f9f9ff] active:bg-[#f0f3ff] disabled:opacity-60"
+            className="flex h-11 w-full items-center justify-center gap-3 rounded-2xl border border-[#c2c6d8] bg-white px-4 text-sm font-medium text-[#111c2d] shadow-sm transition hover:bg-[#f9f9ff] active:bg-[#f0f3ff] disabled:opacity-60"
           >
             {isLoading ? (
               <span className="flex items-center gap-2">

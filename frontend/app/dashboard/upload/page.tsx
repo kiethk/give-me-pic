@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, DragEvent, useEffect, useRef, useState } from "react";
+import { ChangeEvent, DragEvent, useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { createSubject, getSubjects, suggestSubject, Subject } from "@/lib/api-client";
 import { useUploadQueue } from "@/lib/use-upload-queue";
@@ -166,22 +166,29 @@ export default function UploadPage() {
         });
     }
 
+    const handleIncomingFilesRef = useRef(handleIncomingFiles);
+    handleIncomingFilesRef.current = handleIncomingFiles;
+
     useEffect(() => {
         const pending = consumePendingUploadFiles();
         if (pending.length > 0) {
-            handleIncomingFiles(pending);
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+            setTimeout(() => {
+                handleIncomingFilesRef.current(pending);
+            }, 0);
         }
 
         const unsubscribe = subscribePendingUploadFiles((files) => {
             if (files.length > 0) {
                 const consumed = consumePendingUploadFiles();
                 if (consumed.length > 0) {
-                    handleIncomingFiles(consumed);
+                    handleIncomingFilesRef.current(consumed);
                 }
             }
         });
 
         return unsubscribe;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     async function handleStartUpload() {
