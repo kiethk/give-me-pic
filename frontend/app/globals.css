@@ -53,3 +53,12 @@ html, body {
   font-family: var(--font-inter), sans-serif;
   -webkit-font-smoothing: antialiased;
 }
+
+/* Ngăn iOS Safari / PWA tự động zoom khi focus vào ô nhập liệu */
+@media screen and (max-width: 768px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
