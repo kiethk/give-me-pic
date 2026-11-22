@@ -142,6 +142,22 @@ export async function removeFromQueue(clientUploadId: string): Promise<void> {
     });
 }
 
+/** Clear all items in failed status from the queue. */
+export async function clearFailedUploads(): Promise<void> {
+    const db = await openDb();
+    const failed = await getUploads(["failed"]);
+
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, "readwrite");
+        const store = tx.objectStore(STORE_NAME);
+        for (const item of failed) {
+            store.delete(item.clientUploadId);
+        }
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------

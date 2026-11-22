@@ -25,6 +25,9 @@ Last updated: 2026-08-19
 - [x] Phase 3: Reliability & Offline-First (Rate limiting queue, Error states for every async step)
 - [x] Backend tests for auth module
 - [x] Phase 4: PWA (installable web app, offline fallback)
+- [x] Google OAuth Sign-In (backend token verification, user auto-linking, GIS popup button)
+- [x] PWA iOS UX: Fix auto-zoom on input focus (16px minimum font size, locked viewport scale)
+- [x] PWA Upload Queue: Add dismiss/clear-all buttons and auto-recovery for interrupted uploads
 
 ## In Progress
 

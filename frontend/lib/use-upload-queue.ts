@@ -37,6 +37,7 @@ function inferMimeType(fileName: string, currentType?: string): string {
     return currentType || "";
 }
 import {
+    clearFailedUploads,
     enqueue,
     getAllUploads,
     getUploads,
@@ -62,6 +63,10 @@ interface UseUploadQueue {
     addToQueue(subjectId: string, file: File, buffer: ArrayBuffer, caption?: string): Promise<void>;
     /** Manual trigger — useful for a "Retry failed" button. */
     retryFailed(): void;
+    /** Remove an individual item from the queue (dismiss/cancel). */
+    removeItem(clientUploadId: string): Promise<void>;
+    /** Clear all failed items from the queue. */
+    clearFailed(): Promise<void>;
 }
 
 export function useUploadQueue(onUploadSuccess?: () => void): UseUploadQueue {
@@ -174,9 +179,28 @@ export function useUploadQueue(onUploadSuccess?: () => void): UseUploadQueue {
     // -----------------------------------------------------------------------
 
     useEffect(() => {
-        // Initialise queue from IDB on mount
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        refreshQueue();
+        // Initialise queue from IDB and recover interrupted uploads
+        async function initQueue() {
+            try {
+                const all = await getAllUploads();
+                // If any item was left in "uploading" state from a previously closed tab/crash,
+                // recover it to "failed" so it can be retried or dismissed.
+                for (const item of all) {
+                    if (item.status === "uploading") {
+                        await updateStatus(item.clientUploadId, "failed", "Bị gián đoạn khi tải lên.");
+                    }
+                }
+            } catch {
+                // ignore
+            }
+            await refreshQueue();
+
+            if (navigator.onLine) {
+                processQueue();
+            }
+        }
+
+        initQueue();
 
         function handleOnline() {
             setIsOnline(true);
@@ -188,12 +212,6 @@ export function useUploadQueue(onUploadSuccess?: () => void): UseUploadQueue {
 
         window.addEventListener("online", handleOnline);
         window.addEventListener("offline", handleOffline);
-
-        // If we're already online at mount, process any leftover pending items
-        // (e.g. the user was offline, closed the tab, reopened it while online)
-        if (navigator.onLine) {
-            processQueue();
-        }
 
         return () => {
             window.removeEventListener("online", handleOnline);
@@ -238,5 +256,18 @@ export function useUploadQueue(onUploadSuccess?: () => void): UseUploadQueue {
         }
     }, [processQueue]);
 
-    return { queue, isOnline, isProcessing, rateLimitMessage, addToQueue, retryFailed };
+    const removeItem = useCallback(
+        async (clientUploadId: string) => {
+            await removeFromQueue(clientUploadId);
+            await refreshQueue();
+        },
+        [refreshQueue],
+    );
+
+    const clearFailed = useCallback(async () => {
+        await clearFailedUploads();
+        await refreshQueue();
+    }, [refreshQueue]);
+
+    return { queue, isOnline, isProcessing, rateLimitMessage, addToQueue, retryFailed, removeItem, clearFailed };
 }
