@@ -45,6 +45,9 @@ jobs:
           distribution: temurin
           cache: maven
 
+      - name: Make mvnw executable
+        run: chmod +x ./mvnw
+
       - name: Build & run tests
         run: ./mvnw verify -B -Dspring.datasource.url=jdbc:postgresql://localhost:5432/givemepic_test -Dspring.datasource.username=postgres -Dspring.datasource.password=postgres
         env:
