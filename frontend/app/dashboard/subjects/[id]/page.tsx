@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Image from "next/image";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
     deleteMedia,
@@ -40,7 +41,7 @@ export default function SubjectDetailPage() {
     const [previewMedia, setPreviewMedia] = useState<MediaItem | null>(null);
     const [actionMedia, setActionMedia] = useState<MediaItem | null>(null);
 
-    async function load() {
+    const load = useCallback(async () => {
         try {
             const [subjects, items] = await Promise.all([getSubjects(), getMedia(id)]);
             setSubject(subjects.find((s) => s.id === id) ?? null);
@@ -48,9 +49,9 @@ export default function SubjectDetailPage() {
         } finally {
             setIsLoading(false);
         }
-    }
+    }, [id]);
 
-    useEffect(() => { load(); }, [id]);
+    useEffect(() => { load(); }, [load]);
 
     // Auto-poll while any item is pending/processing
     useEffect(() => {
@@ -198,9 +199,11 @@ export default function SubjectDetailPage() {
                                     onClick={() => setPreviewMedia(media)}
                                 >
                                     <div className="aspect-square overflow-hidden bg-[#f0f3ff] relative">
-                                        <img
+                                        <Image
                                             src={media.url}
                                             alt={media.caption || media.fileName}
+                                            fill
+                                            unoptimized
                                             className="h-full w-full object-cover transition-transform duration-300 md:group-hover:scale-105"
                                         />
                                         <div className="absolute inset-0 bg-black/5 md:group-hover:bg-black/0 transition-colors" />
@@ -302,6 +305,7 @@ export default function SubjectDetailPage() {
                             </button>
                         </div>
                         <div className="flex flex-1 min-h-0 items-center justify-center overflow-auto bg-[#f0f3ff] p-4">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                                 src={previewMedia.url}
                                 alt={previewMedia.fileName}
@@ -347,11 +351,12 @@ export default function SubjectDetailPage() {
                         </button>
                         
                         <button
+                            disabled={isDeleting[actionMedia.id]}
                             onClick={() => {
                                 handleDelete(actionMedia.id);
                                 setActionMedia(null);
                             }}
-                            className="flex w-full items-center gap-3 rounded-xl px-4 py-3.5 text-[15px] font-medium text-[#ba1a1a] hover:bg-[#ffdad6] transition-colors"
+                            className="flex w-full items-center gap-3 rounded-xl px-4 py-3.5 text-[15px] font-medium text-[#ba1a1a] hover:bg-[#ffdad6] transition-colors disabled:opacity-50"
                         >
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>

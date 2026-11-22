@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -436,9 +437,12 @@ export default function ChatPage() {
                                                                 onClick={() => setPreviewCitation(citation)}
                                                                 className="flex items-center gap-2 rounded-lg border border-[#e2e8f0] bg-[#f9f9ff] px-2 py-1.5 text-left hover:bg-[#e7eeff] transition-colors"
                                                             >
-                                                                <img
+                                                                <Image
                                                                     src={citation.imageUrl}
                                                                     alt={citation.fileName}
+                                                                    width={24}
+                                                                    height={24}
+                                                                    unoptimized
                                                                     className="h-6 w-6 rounded object-cover"
                                                                 />
                                                                 <span className="max-w-[110px] truncate text-xs font-medium text-[#424656]">
@@ -506,6 +510,7 @@ export default function ChatPage() {
                             </button>
                         </div>
                         <div className="flex max-h-[70vh] items-center justify-center overflow-auto bg-[#f0f3ff] p-4">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                                 src={previewCitation.imageUrl}
                                 alt={previewCitation.fileName}

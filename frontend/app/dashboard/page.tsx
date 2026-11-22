@@ -213,10 +213,6 @@ export default function SubjectsPage() {
                     <span className="hidden md:inline">New subject</span>
                 </button>
             </div>
-            
-            <p className="mt-2 text-[13px] md:text-sm text-[#727687]">
-                Organise and store lecture images by subject.
-            </p>
 
             {/* Grid */}
             {isLoading ? (

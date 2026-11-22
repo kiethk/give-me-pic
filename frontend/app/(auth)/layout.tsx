@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <main className="flex min-h-screen bg-[#f0f3ff]">
@@ -5,7 +7,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       <section className="hidden w-[45%] flex-col justify-between bg-[#0050cb] p-12 text-white lg:flex">
         <div className="relative z-10">
           <div className="flex items-center gap-3">
-            <img src="/icons/icon-192x192.png" alt="Give Me Pic logo" className="h-10 w-10 rounded-xl object-cover shadow-sm" />
+            <Image src="/icons/icon-192x192.png" alt="Give Me Pic logo" width={40} height={40} className="h-10 w-10 rounded-xl object-cover shadow-sm" priority />
             <span className="text-lg font-bold tracking-tight">Give Me Pic</span>
           </div>
           <h1 className="mt-20 max-w-lg text-4xl font-bold leading-tight tracking-tight text-white xl:text-5xl">
@@ -39,7 +41,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         <div className="w-full max-w-[420px]">
           {/* Mobile logo */}
           <div className="mb-10 flex items-center gap-3 lg:hidden">
-            <img src="/icons/icon-192x192.png" alt="Give Me Pic logo" className="h-10 w-10 rounded-xl object-cover shadow-sm" />
+            <Image src="/icons/icon-192x192.png" alt="Give Me Pic logo" width={40} height={40} className="h-10 w-10 rounded-xl object-cover shadow-sm" priority />
             <span className="text-xl font-bold tracking-tight text-[#111c2d]">Give Me Pic</span>
           </div>
 

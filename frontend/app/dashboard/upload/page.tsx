@@ -15,7 +15,10 @@ function Thumbnail({ buffer, type, alt }: { buffer: ArrayBuffer; type: string; a
         return () => URL.revokeObjectURL(u);
     }, [buffer, type]);
     if (!url) return null;
-    return <img src={url} alt={alt} className="h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />;
+    return (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img src={url} alt={alt} className="h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+    );
 }
 
 export default function UploadPage() {

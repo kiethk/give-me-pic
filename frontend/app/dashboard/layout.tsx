@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -73,7 +74,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <aside className="hidden md:flex w-[220px] shrink-0 flex-col border-r border-[#e2e8f0] bg-white">
                 {/* Logo */}
                 <div className="flex h-16 items-center gap-2.5 border-b border-[#e2e8f0] px-5">
-                    <img src="/icons/icon-192x192.png" alt="Give Me Pic logo" className="h-8 w-8 rounded-lg object-cover" />
+                    <Image src="/icons/icon-192x192.png" alt="Give Me Pic logo" width={32} height={32} className="h-8 w-8 rounded-lg object-cover" />
                     <span className="text-[15px] font-bold text-[#111c2d] tracking-tight">Give Me Pic</span>
                 </div>
 
@@ -102,7 +103,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <div className="border-t border-[#e2e8f0] px-3 py-4">
                     <div className="flex items-center gap-3 rounded-lg px-2 py-2">
                         {profile?.avatarUrl ? (
-                            <img src={profile.avatarUrl} alt="Avatar" className="h-8 w-8 shrink-0 rounded-full object-cover shadow-sm" />
+                            <Image src={profile.avatarUrl} alt="Avatar" width={32} height={32} unoptimized className="h-8 w-8 shrink-0 rounded-full object-cover shadow-sm" />
                         ) : (
                             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#0050cb] text-[13px] font-semibold text-white">
                                 {profile?.displayName?.[0]?.toUpperCase() ?? "U"}
@@ -154,7 +155,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {/* Mobile Top bar */}
                 <header className="flex md:hidden h-14 shrink-0 items-center justify-between border-b border-[#e2e8f0] bg-white px-4">
                     <div className="flex items-center gap-2">
-                        <img src="/icons/icon-192x192.png" alt="Logo" className="h-7 w-7 rounded-md object-cover" />
+                        <Image src="/icons/icon-192x192.png" alt="Logo" width={28} height={28} className="h-7 w-7 rounded-md object-cover" />
                         <span className="text-[15px] font-bold text-[#111c2d] tracking-tight">Give Me Pic</span>
                     </div>
                     <button onClick={() => setShowProfileSheet(true)} className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0050cb] text-[11px] font-semibold text-white">
@@ -171,7 +172,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <div className="px-5 py-4">
                         <div className="flex flex-col items-center gap-3 border-b border-[#f0f3ff] pb-5">
                             {profile?.avatarUrl ? (
-                                <img src={profile.avatarUrl} alt="Avatar" className="h-16 w-16 rounded-full object-cover shadow-sm" />
+                                <Image src={profile.avatarUrl} alt="Avatar" width={64} height={64} unoptimized className="h-16 w-16 rounded-full object-cover shadow-sm" />
                             ) : (
                                 <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#0050cb] text-2xl font-semibold text-white">
                                     {profile?.displayName?.[0]?.toUpperCase() ?? "U"}

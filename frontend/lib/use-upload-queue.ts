@@ -12,7 +12,6 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { uploadMedia } from "@/lib/api-client";
 
 function generateId() {
     if (typeof crypto !== "undefined" && crypto.randomUUID) {

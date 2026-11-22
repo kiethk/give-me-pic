@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { getProfile, updateProfile, uploadAvatar, UserProfile } from "@/lib/api-client";
 import { useRouter } from "next/navigation";
@@ -148,9 +149,12 @@ export default function SettingsPage() {
                             className="relative h-20 w-20 shrink-0 rounded-full overflow-hidden ring-4 ring-[#e7eeff] hover:ring-[#0050cb]/30 transition-all active:scale-95 group"
                         >
                             {previewUrl ? (
-                                <img
+                                <Image
                                     src={previewUrl}
                                     alt="Avatar"
+                                    width={80}
+                                    height={80}
+                                    unoptimized
                                     className="h-full w-full object-cover"
                                 />
                             ) : (
