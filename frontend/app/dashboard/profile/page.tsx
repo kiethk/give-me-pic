@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { getProfile, updateProfile, uploadAvatar, UserProfile } from "@/lib/api-client";
 import { useRouter } from "next/navigation";
 
-export default function SettingsPage() {
+export default function ProfilePage() {
     const router = useRouter();
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -110,7 +110,7 @@ export default function SettingsPage() {
     return (
         <div className="mx-auto max-w-2xl px-4 py-6 md:px-8 md:py-8">
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#111c2d]">
-                Profile Settings
+                Profile
             </h1>
             <p className="mt-1 text-sm text-[#727687]">
                 Manage your account information and preferences.

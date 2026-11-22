@@ -138,21 +138,6 @@ export default function GoogleSignInButton({
     }
   }, [clientId, scriptLoaded, mode, handleCredentialResponse]);
 
-  function handleCustomClick() {
-    if (!clientId) {
-      onError?.("Tính năng Google Sign-In chưa được cấu hình Client ID.");
-      return;
-    }
-
-    if (window.google?.accounts?.id) {
-      window.google.accounts.id.prompt(() => {});
-    } else {
-      onError?.("Đang tải thư viện Google, vui lòng thử lại sau vài giây.");
-    }
-  }
-
-  const labelText = "Continue with Google";
-
   return (
     <div className={`w-full ${className}`}>
       {clientId && (
@@ -164,16 +149,11 @@ export default function GoogleSignInButton({
         />
       )}
 
-      <div className="relative flex w-full justify-center">
-        {/* Layer 1 (Visible UI): Custom rounded-xl button matching the Sign In button exactly */}
-        <button
-          type="button"
-          onClick={handleCustomClick}
-          disabled={isLoading}
-          className="relative flex h-11 w-full items-center justify-center rounded-xl border border-[#cbd5e1] bg-white px-4 text-sm font-medium text-[#111c2d] shadow-sm transition hover:bg-[#f8fafc] hover:border-[#94a3b8] active:bg-[#f1f5f9] disabled:opacity-60"
-        >
+      <div className="flex w-full justify-center">
+        {/* Outer wrapper enforcing rounded-xl, 44px height, matching Sign In button */}
+        <div className="group relative flex h-11 w-full items-center justify-center overflow-hidden rounded-xl border border-[#cbd5e1] bg-white shadow-sm transition hover:border-[#94a3b8] hover:bg-[#f8fafc]">
           {isLoading ? (
-            <span className="flex items-center gap-2">
+            <span className="flex items-center gap-2 text-sm font-medium text-[#111c2d]">
               <svg
                 className="h-4 w-4 animate-spin text-[#0050cb]"
                 viewBox="0 0 24 24"
@@ -188,21 +168,21 @@ export default function GoogleSignInButton({
               Connecting...
             </span>
           ) : (
-            <>
-              <GoogleIcon className="absolute left-3.5 h-5 w-5 shrink-0" />
-              <span>{labelText}</span>
-            </>
+            <div
+              ref={googleBtnContainerRef}
+              data-testid="google-signin-btn"
+              className="flex h-full w-full items-center justify-center scale-y-[1.18] scale-x-[1.02] translate-x-1 origin-center [&_iframe]:!w-full [&_iframe]:!h-full [&>div]:!w-full [&>div]:!h-full"
+            >
+              {/* Fallback before Google script renders */}
+              {!scriptLoaded && (
+                <div className="flex h-full w-full items-center justify-center gap-3 px-4 text-sm font-medium text-[#111c2d]">
+                  <GoogleIcon className="h-5 w-5 shrink-0" />
+                  <span>Continue with Google</span>
+                </div>
+              )}
+            </div>
           )}
-        </button>
-
-        {/* Layer 2 (Interactive Overlay): Invisible Google iframe receiving clicks */}
-        {clientId && (
-          <div
-            ref={googleBtnContainerRef}
-            data-testid="google-signin-btn"
-            className="absolute inset-0 z-10 flex w-full h-full items-center justify-center opacity-[0.0001] cursor-pointer overflow-hidden rounded-xl [&_iframe]:!w-full [&_iframe]:!h-full [&_iframe]:cursor-pointer"
-          />
-        )}
+        </div>
       </div>
     </div>
   );

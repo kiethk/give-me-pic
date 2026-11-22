@@ -28,6 +28,7 @@ Last updated: 2026-08-19
 - [x] Google OAuth Sign-In (backend token verification, user auto-linking, GIS popup button)
 - [x] PWA iOS UX: Fix auto-zoom on input focus (16px minimum font size, locked viewport scale)
 - [x] PWA Upload Queue: Add dismiss/clear-all buttons and auto-recovery for interrupted uploads
+- [x] UI Topbar Redesign: Typography-only tabs with bottom border indicator and profile dropdown
 
 ## In Progress
 

@@ -39,13 +39,7 @@ function IconCamera({ className = "w-6 h-6" }: { className?: string }) {
         </svg>
     );
 }
-function IconSettings({ active }: { active: boolean }) {
-    return (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={active ? "#0050cb" : "#727687"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-        </svg>
-    );
-}
+
 
 function inferMimeType(fileName: string, currentType?: string): string {
     if (currentType && currentType.startsWith("image/")) {
@@ -63,7 +57,6 @@ const navLinks = [
     { href: "/dashboard/chat",   label: "Ask AI",     Icon: IconChat },
     { href: "/dashboard",        label: "Subjects",   Icon: IconGrid },
     { href: "/dashboard/upload", label: "Upload",     Icon: IconUpload },
-    { href: "/dashboard/settings", label: "Settings", Icon: IconSettings },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -72,15 +65,27 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [showProfileSheet, setShowProfileSheet] = useState(false);
     const [showCaptureSheet, setShowCaptureSheet] = useState(false);
+    const [showUserMenu, setShowUserMenu] = useState(false);
 
     const cameraInputRef = useRef<HTMLInputElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const userMenuRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         getProfile()
             .then(setProfile)
             .catch(() => router.push("/"));
     }, [router]);
+
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+                setShowUserMenu(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
 
     async function handleLogout() {
         await logout();
@@ -134,89 +139,130 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
 
     return (
-        <div className="flex h-full bg-[#f0f3ff] md:flex-row flex-col">
-            {/* ── Sidebar (Desktop Only) ── */}
-            <aside className="hidden md:flex w-[220px] shrink-0 flex-col border-r border-[#e2e8f0] bg-white">
-                {/* Logo */}
-                <div className="flex h-16 items-center gap-2.5 border-b border-[#e2e8f0] px-5">
-                    <Image src="/icons/icon-192x192.png" alt="Give Me Pic logo" width={32} height={32} className="h-8 w-8 rounded-lg object-cover" />
-                    <span className="text-[15px] font-bold text-[#111c2d] tracking-tight">Give Me Pic</span>
+        <div className="flex h-full flex-col bg-[#f0f3ff]">
+            {/* ── Desktop Top bar ── */}
+            <header className="hidden md:flex h-14 shrink-0 items-center justify-between border-b border-[#e2e8f0] bg-white px-6 z-30">
+                {/* Left: Brand & Clean Top Navigation Tabs */}
+                <div className="flex h-full items-center gap-6">
+                    {/* Brand */}
+                    <Link href="/dashboard" className="flex items-center gap-2.5 transition-opacity hover:opacity-90">
+                        <Image src="/icons/icon-192x192.png" alt="Give Me Pic logo" width={28} height={28} className="h-7 w-7 rounded-lg object-cover shadow-xs" />
+                        <span className="text-[15px] font-bold text-[#0f172a] tracking-tight">Give Me Pic</span>
+                    </Link>
+
+                    {/* Subtle Divider */}
+                    <div className="h-4 w-px bg-[#e2e8f0]" />
+
+                    {/* Nav tabs: Pure typography with active bottom underline indicator */}
+                    <nav className="flex h-full items-center gap-1">
+                        {navLinks.map(({ href, label }) => {
+                            const active = isActive(href);
+                            return (
+                                <Link
+                                    key={href}
+                                    href={href}
+                                    className={`relative flex h-full items-center px-3.5 text-[13px] tracking-wide transition-colors ${
+                                        active
+                                            ? "font-semibold text-[#0050cb]"
+                                            : "font-medium text-[#64748b] hover:text-[#0f172a]"
+                                    }`}
+                                >
+                                    {label}
+                                    {active && (
+                                        <span className="absolute bottom-0 left-2 right-2 h-[2px] rounded-t-full bg-[#0050cb]" />
+                                    )}
+                                </Link>
+                            );
+                        })}
+                    </nav>
                 </div>
 
-                {/* Nav links */}
-                <nav className="flex-1 space-y-1 px-3 py-4">
-                    {navLinks.map(({ href, label, Icon }) => {
-                        const active = isActive(href);
-                        return (
-                            <Link
-                                key={href}
-                                href={href}
-                                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                                    active
-                                        ? "bg-[#e7eeff] text-[#0050cb]"
-                                        : "text-[#424656] hover:bg-[#f0f3ff] hover:text-[#111c2d]"
-                                }`}
-                            >
-                                <Icon active={active} />
-                                {label}
-                            </Link>
-                        );
-                    })}
-                </nav>
+                {/* Right: Upgrade Pro pill & User profile dropdown */}
+                <div className="flex items-center gap-3">
+                    <button className="flex items-center gap-1.5 rounded-lg border border-[#c7d7fe] bg-[#f0f4ff] px-3 py-1.5 text-xs font-semibold text-[#0050cb] shadow-xs transition hover:bg-[#e0eaff] hover:border-[#b2c8fd] active:scale-[0.98]">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7-6.3-4.6-6.3 4.6 2.3-7-6-4.6h7.6z"/>
+                        </svg>
+                        Upgrade Pro
+                    </button>
 
-                {/* User profile */}
-                <div className="border-t border-[#e2e8f0] px-3 py-4">
-                    <div className="flex items-center gap-3 rounded-lg px-2 py-2">
-                        {profile?.avatarUrl ? (
-                            <Image src={profile.avatarUrl} alt="Avatar" width={32} height={32} unoptimized className="h-8 w-8 shrink-0 rounded-full object-cover shadow-sm" />
-                        ) : (
-                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#0050cb] text-[13px] font-semibold text-white">
-                                {profile?.displayName?.[0]?.toUpperCase() ?? "U"}
-                            </div>
-                        )}
-                        <div className="min-w-0 flex-1">
-                            <p className="truncate text-[13px] font-semibold text-[#111c2d]">
-                                {profile?.displayName ?? "…"}
-                            </p>
-                            <p className="truncate text-[11px] text-[#727687]">Student</p>
-                        </div>
+                    {/* User profile dropdown container */}
+                    <div className="relative" ref={userMenuRef}>
                         <button
-                            onClick={handleLogout}
-                            title="Sign out"
-                            className="rounded p-1 text-[#727687] hover:text-[#ba1a1a] transition-colors"
+                            type="button"
+                            onClick={() => setShowUserMenu(!showUserMenu)}
+                            className={`flex items-center gap-2 rounded-lg px-2 py-1 text-left transition-colors border border-transparent ${
+                                showUserMenu ? "bg-[#f1f5f9] border-[#e2e8f0]" : "hover:bg-[#f8fafc]"
+                            }`}
                         >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                                <polyline points="16 17 21 12 16 7" />
-                                <line x1="21" y1="12" x2="9" y2="12" />
+                            {profile?.avatarUrl ? (
+                                <Image src={profile.avatarUrl} alt="Avatar" width={28} height={28} unoptimized className="h-7 w-7 shrink-0 rounded-full object-cover shadow-xs ring-1 ring-slate-200" />
+                            ) : (
+                                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#0050cb] text-xs font-bold text-white shadow-xs">
+                                    {profile?.displayName?.[0]?.toUpperCase() ?? "U"}
+                                </div>
+                            )}
+                            <span className="max-w-[130px] truncate text-xs font-semibold text-[#0f172a]">
+                                {profile?.displayName ?? "…"}
+                            </span>
+                            <svg
+                                width="12"
+                                height="12"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className={`shrink-0 text-[#94a3b8] transition-transform ${showUserMenu ? "rotate-180 text-[#0f172a]" : ""}`}
+                            >
+                                <polyline points="6 9 12 15 18 9" />
                             </svg>
                         </button>
+
+                        {/* Floating Dropdown Menu */}
+                        {showUserMenu && (
+                            <div className="absolute top-[calc(100%+8px)] right-0 z-50 w-52 rounded-2xl border border-[#e2e8f0] bg-white p-1.5 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.1),0_8px_10px_-6px_rgba(0,0,0,0.06)] animate-in fade-in slide-in-from-top-2 duration-150">
+                                <div className="border-b border-[#f1f5f9] px-3 py-2.5">
+                                    <p className="truncate text-xs font-semibold text-[#0f172a]">{profile?.displayName ?? "…"}</p>
+                                    <p className="truncate text-[11px] text-[#64748b]">{profile?.email ?? ""}</p>
+                                </div>
+                                <div className="pt-1 space-y-0.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setShowUserMenu(false);
+                                            router.push("/dashboard/profile");
+                                        }}
+                                        className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-[#1e293b] hover:bg-[#f1f5f9] transition-colors"
+                                    >
+                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#64748b]">
+                                            <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                                        </svg>
+                                        Profile
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setShowUserMenu(false);
+                                            handleLogout();
+                                        }}
+                                        className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-[#ba1a1a] hover:bg-[#fff5f5] transition-colors"
+                                    >
+                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#ba1a1a]">
+                                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+                                        </svg>
+                                        Log out
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
-            </aside>
+            </header>
 
             {/* ── Main content ── */}
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden relative">
-                {/* Desktop Top bar */}
-                <header className="hidden md:flex h-16 shrink-0 items-center justify-between border-b border-[#e2e8f0] bg-white px-8">
-                    <div className="flex h-9 w-72 items-center gap-2.5 rounded-lg border border-[#e2e8f0] bg-[#f9f9ff] px-3">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#727687" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                        </svg>
-                        <span className="text-sm text-[#727687]">Search content…</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <button className="relative rounded-lg p-2 text-[#424656] hover:bg-[#f0f3ff] transition-colors">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-                            </svg>
-                        </button>
-                        <button className="rounded-lg bg-[#0050cb] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0066ff] transition-colors">
-                            Upgrade Pro
-                        </button>
-                    </div>
-                </header>
-
                 {/* Mobile Top bar */}
                 <header className="flex md:hidden h-14 shrink-0 items-center justify-between border-b border-[#e2e8f0] bg-white px-4">
                     <div className="flex items-center gap-2">
@@ -252,12 +298,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                             <button
                                 onClick={() => {
                                     setShowProfileSheet(false);
-                                    router.push("/dashboard/settings");
+                                    router.push("/dashboard/profile");
                                 }}
                                 className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-[#111c2d] hover:bg-[#f0f3ff] transition-colors"
                             >
-                                <IconSettings active={false} />
-                                Profile Settings
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#64748b]">
+                                    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                                </svg>
+                                Profile
                             </button>
                             <button
                                 onClick={() => {
@@ -269,7 +317,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
                                 </svg>
-                                Sign out
+                                Log out
                             </button>
                         </div>
                     </div>
