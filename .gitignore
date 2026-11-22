@@ -28,6 +28,13 @@ frontend/.env*
 .DS_Store
 Thumbs.db
 
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+
 # Logs and tool outputs
 *.log
 .vercel

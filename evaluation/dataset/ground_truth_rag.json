@@ -1,0 +1,122 @@
+[
+  {
+    "id": "eval_001",
+    "image_source": "samples/lecture_01_btree_indexing.jpg",
+    "subject": "Cơ sở dữ liệu nâng cao",
+    "lecture_topic": "B-Tree Indexing trong RDBMS",
+    "ocr_ground_truth": "B-Tree Indexing trong PostgreSQL. Cấu trúc cây tự cân bằng gồm Root, Internal Nodes, và Leaf Nodes. Các nút lá (Leaf Nodes) được liên kết đôi (doubly-linked) theo thứ tự sắp xếp tăng dần. Tối ưu cho cả truy vấn điểm O(log N) và truy vấn phạm vi (Range Query: BETWEEN, <, >) thông qua việc duyệt tuần tự các lá kề nhau.",
+    "question": "Chỉ mục B-Tree trong PostgreSQL hoạt động như thế nào và tại sao nó tối ưu cho các truy vấn phạm vi (range queries)?",
+    "ground_truth_answer": "B-Tree trong PostgreSQL là cấu trúc cây tự cân bằng có các nút lá được liên kết kép theo thứ tự sắp xếp. Nó tối ưu cho truy vấn phạm vi (range queries như BETWEEN, <, >) vì sau khi tìm được nút lá đầu tiên qua phép duyệt cây O(log N), hệ thống chỉ cần duyệt tuần tự qua con trỏ liên kết giữa các nút lá mà không cần duyệt lại từ gốc.",
+    "expected_citations": [
+      {
+        "file_name": "lecture_01_btree_indexing.jpg",
+        "key_phrase": "B-Tree Indexing trong PostgreSQL"
+      }
+    ]
+  },
+  {
+    "id": "eval_002",
+    "image_source": "samples/lecture_02_tcp_handshake.jpg",
+    "subject": "Mạng máy tính",
+    "lecture_topic": "Giao thức TCP & Bắt tay 3 bước",
+    "ocr_ground_truth": "TCP 3-Way Handshake: 1. Client gửi SYN (seq=x) yêu cầu thiết lập phiên. 2. Server phản hồi SYN-ACK (seq=y, ack=x+1) xác nhận và gửi sequence number của mình. 3. Client phản hồi ACK (ack=y+1) hoàn tất kết nối hai chiều tin cậy.",
+    "question": "Quá trình 3-way handshake của giao thức TCP diễn ra như thế nào và cờ SYN, ACK đóng vai trò gì?",
+    "ground_truth_answer": "Quá trình 3-way handshake gồm 3 bước: 1. Client gửi cờ SYN kèm số thứ tự khởi tạo (ISN) để yêu cầu kết nối. 2. Server phản hồi bằng gói tin SYN-ACK xác nhận ISN của client và gửi ISN của server. 3. Client gửi lại gói ACK xác nhận ISN của server. Quá trình này giúp đồng bộ số thứ tự gói tin và đảm bảo đường truyền hai chiều tin cậy.",
+    "expected_citations": [
+      {
+        "file_name": "lecture_02_tcp_handshake.jpg",
+        "key_phrase": "TCP 3-Way Handshake"
+      }
+    ]
+  },
+  {
+    "id": "eval_003",
+    "image_source": "samples/lecture_03_java_polymorphism.jpg",
+    "subject": "Lập trình Hướng đối tượng",
+    "lecture_topic": "Tính đa hình và Đóng gói trong Java",
+    "ocr_ground_truth": "Polymorphism in Java. Compile-time (Static): Method Overloading, cùng tên phương thức, khác chữ ký tham số, quyết định lúc biên dịch. Runtime (Dynamic): Method Overriding, ghi đè phương thức lớp cha, cơ chế Dynamic Method Dispatch xác định phương thức thực thi dựa trên instance thực tế.",
+    "question": "Phân biệt tính Đa hình lúc biên dịch (Compile-time) và Đa hình lúc chạy (Runtime) trong Java?",
+    "ground_truth_answer": "Đa hình lúc biên dịch (Compile-time Polymorphism) được thực hiện qua nạp chồng phương thức (Method Overloading) khi các phương thức cùng tên nhưng khác tham số và được quyết định bởi trình biên dịch. Đa hình lúc chạy (Runtime Polymorphism) được thực hiện qua ghi đè phương thức (Method Overriding) với cơ chế Dynamic Method Dispatch, phương thức thực thi được quyết định tại runtime dựa trên đối tượng thực tế.",
+    "expected_citations": [
+      {
+        "file_name": "lecture_03_java_polymorphism.jpg",
+        "key_phrase": "Polymorphism in Java"
+      }
+    ]
+  },
+  {
+    "id": "eval_004",
+    "image_source": "samples/lecture_04_os_deadlock.jpg",
+    "subject": "Hệ điều hành",
+    "lecture_topic": "Bế tắc hệ thống (Deadlock)",
+    "ocr_ground_truth": "4 Điều kiện Coffman gây Deadlock: 1. Mutual Exclusion (Loại trừ tương hỗ). 2. Hold and Wait (Giữ và chờ tài nguyên). 3. No Preemption (Không thể chiếm đoạt). 4. Circular Wait (Chờ đợi vòng tròn khép kín).",
+    "question": "Bốn điều kiện Coffman dẫn đến hiện tượng Deadlock trong hệ điều hành là gì?",
+    "ground_truth_answer": "Bốn điều kiện Coffman bao gồm: 1. Mutual Exclusion (Loại trừ tương hỗ): Ít nhất một tài nguyên không thể chia sẻ. 2. Hold and Wait (Giữ và chờ): Tiến trình đang giữ tài nguyên và xin cấp thêm tài nguyên mới. 3. No Preemption (Không thu hồi): Tài nguyên chỉ được giải phóng tự nguyện bởi tiến trình. 4. Circular Wait (Chờ đợi vòng tròn): Tồn tại chuỗi tiến trình chờ tài nguyên của nhau theo vòng khép kín.",
+    "expected_citations": [
+      {
+        "file_name": "lecture_04_os_deadlock.jpg",
+        "key_phrase": "4 Điều kiện Coffman gây Deadlock"
+      }
+    ]
+  },
+  {
+    "id": "eval_005",
+    "image_source": "samples/lecture_05_cap_theorem.jpg",
+    "subject": "Thiết kế Hệ thống phân tán",
+    "lecture_topic": "Định lý CAP",
+    "ocr_ground_truth": "CAP Theorem (Eric Brewer): Trong một hệ thống phân tán, chỉ có thể thỏa mãn tối đa 2 trong 3 tính chất: Consistency (C), Availability (A), Partition Tolerance (P). Khi mạng bị phân mảnh (P), kiến trúc bắt buộc phải đánh đổi giữa CP hoặc AP.",
+    "question": "Định lý CAP phát biểu điều gì và tại sao hệ thống phân tán chỉ có thể chọn tối đa 2 trong 3 thuộc tính?",
+    "ground_truth_answer": "Định lý CAP phát biểu rằng một hệ thống phân tán chỉ có thể đảm bảo tối đa 2 trong 3 thuộc tính: Consistency (Nhất quán), Availability (Sẵn sàng), và Partition Tolerance (Chịu lỗi phân mảnh mạng). Vì trong môi trường mạng thực tế, phân mảnh mạng (Network Partition) là không thể tránh khỏi, hệ thống bắt buộc phải chọn giữa việc tiếp tục phục vụ dữ liệu có thể cũ (AP) hoặc từ chối phục vụ để bảo vệ tính nhất quán (CP).",
+    "expected_citations": [
+      {
+        "file_name": "lecture_05_cap_theorem.jpg",
+        "key_phrase": "CAP Theorem (Eric Brewer)"
+      }
+    ]
+  },
+  {
+    "id": "eval_006",
+    "image_source": "samples/lecture_06_jwt_auth.jpg",
+    "subject": "Bảo mật Ứng dụng Web",
+    "lecture_topic": "Cơ chế xác thực JSON Web Token",
+    "ocr_ground_truth": "JSON Web Token (JWT) Structure: Header (thuật toán mã hóa), Payload (claims dữ liệu), Signature (chữ ký số tạo bởi HMAC-SHA256 với secret key). Giúp hệ thống xác thực stateless mà không cần lưu session trong DB.",
+    "question": "Cấu trúc của JSON Web Token (JWT) gồm những phần nào và cơ chế bảo mật của chữ ký (Signature) là gì?",
+    "ground_truth_answer": "JWT gồm 3 phần phân tách bằng dấu chấm: Header (thuật toán và loại token), Payload (chứa các claims thông tin), và Signature (chữ ký số). Signature được tạo bằng cách băm Header và Payload với một khóa bí mật (Secret Key) thông qua thuật toán HMAC SHA256 hoặc ký bằng private key. Signature giúp server xác thực tính toàn vẹn của token mà không bị client giả mạo hay sửa đổi dữ liệu.",
+    "expected_citations": [
+      {
+        "file_name": "lecture_06_jwt_auth.jpg",
+        "key_phrase": "JSON Web Token (JWT) Structure"
+      }
+    ]
+  },
+  {
+    "id": "eval_007",
+    "image_source": "samples/lecture_07_spring_transactional.jpg",
+    "subject": "Spring Boot & Enterprise Java",
+    "lecture_topic": "Quản lý Transaction và Isolation Level",
+    "ocr_ground_truth": "Spring @Transactional Mechanism: Hoạt động dựa trên Spring AOP Proxy. Khi có request gọi vào bean, Proxy can thiệp mở Transaction. Chú ý: Self-invocation (gọi phương thức nội bộ trong cùng bean) sẽ bỏ qua Proxy làm mất tác dụng của @Transactional.",
+    "question": "Annotation @Transactional trong Spring Boot hoạt động như thế nào và rủi ro khi gọi self-invocation là gì?",
+    "ground_truth_answer": "Annotation @Transactional sử dụng Spring AOP để tạo Dynamic Proxy bao bọc phương thức và quản lý transaction (commit/rollback). Khi xảy ra self-invocation (phương thức trong cùng class gọi nhau trực tiếp qua 'this'), lời gọi không đi qua Spring Proxy nên @Transactional bị vô hiệu hóa, khiến transaction không được mở và quản lý như mong muốn.",
+    "expected_citations": [
+      {
+        "file_name": "lecture_07_spring_transactional.jpg",
+        "key_phrase": "Spring @Transactional Mechanism"
+      }
+    ]
+  },
+  {
+    "id": "eval_008",
+    "image_source": "samples/lecture_08_hnsw_pgvector.jpg",
+    "subject": "Vector Database & RAG Pipeline",
+    "lecture_topic": "Chỉ mục HNSW và Khoảng cách Cosine",
+    "ocr_ground_truth": "HNSW (Hierarchical Navigable Small World) Indexing in pgvector. Cấu trúc đồ thị nhiều tầng (multi-layer graph) tìm kiếm láng giềng k-NN với độ phức tạp O(log N). Tối ưu vượt trội so với Flat Scan O(N) khi tập dữ liệu hàng chục nghìn vector.",
+    "question": "Tại sao pgvector sử dụng chỉ mục HNSW thay vì Flat scan khi truy vấn độ tương đồng vector trong RAG?",
+    "ground_truth_answer": "Truy vấn Flat scan tính khoảng cách giữa vector truy vấn với tất cả vector trong bảng, có độ phức tạp O(N) khiến độ trễ tăng nhanh khi dữ liệu lớn. HNSW (Hierarchical Navigable Small World) là thuật toán đồ thị nhiều tầng giúp tìm kiếm k láng giềng gần nhất (k-NN) với độ phức tạp xấp xỉ O(log N), giảm độ trễ truy vấn vector xuống dưới vài chục mili-giây với độ chính xác cao.",
+    "expected_citations": [
+      {
+        "file_name": "lecture_08_hnsw_pgvector.jpg",
+        "key_phrase": "HNSW (Hierarchical Navigable Small World) Indexing in pgvector"
+      }
+    ]
+  }
+]
