@@ -69,7 +69,7 @@ export default function UploadPage() {
             .catch(() => {});
     }, []);
 
-    async function handleIncomingFiles(files: FileList | File[]) {
+    const handleIncomingFiles = useCallback(async (files: FileList | File[]) => {
         try {
             const rawFiles = Array.from(files);
             if (rawFiles.length === 0) return;
@@ -143,7 +143,7 @@ export default function UploadPage() {
         } catch (error) {
             alert(`Error reading files: ${error instanceof Error ? error.message : String(error)}`);
         }
-    }
+    }, [subjects]);
 
     function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
         if (e.target.files) handleIncomingFiles(e.target.files);
@@ -166,30 +166,26 @@ export default function UploadPage() {
         });
     }
 
-    const handleIncomingFilesRef = useRef(handleIncomingFiles);
-    handleIncomingFilesRef.current = handleIncomingFiles;
-
     useEffect(() => {
         const pending = consumePendingUploadFiles();
         if (pending.length > 0) {
-            // eslint-disable-next-line react-hooks/set-state-in-effect
-            setTimeout(() => {
-                handleIncomingFilesRef.current(pending);
+            const timer = setTimeout(() => {
+                handleIncomingFiles(pending);
             }, 0);
+            return () => clearTimeout(timer);
         }
 
         const unsubscribe = subscribePendingUploadFiles((files) => {
             if (files.length > 0) {
                 const consumed = consumePendingUploadFiles();
                 if (consumed.length > 0) {
-                    handleIncomingFilesRef.current(consumed);
+                    handleIncomingFiles(consumed);
                 }
             }
         });
 
         return unsubscribe;
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [handleIncomingFiles]);
 
     async function handleStartUpload() {
         if (stagedFiles.length === 0) return;

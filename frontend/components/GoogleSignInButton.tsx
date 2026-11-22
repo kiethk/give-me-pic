@@ -129,6 +129,7 @@ export default function GoogleSignInButton({
           size: "large",
           text: "continue_with",
           shape: "rectangular",
+          logo_alignment: "left",
           width: buttonWidth,
         });
       }
@@ -164,54 +165,43 @@ export default function GoogleSignInButton({
       )}
 
       <div className="relative flex w-full justify-center">
-        {clientId ? (
+        {/* Layer 1 (Visible UI): Custom rounded-xl button matching the Sign In button exactly */}
+        <button
+          type="button"
+          onClick={handleCustomClick}
+          disabled={isLoading}
+          className="relative flex h-11 w-full items-center justify-center rounded-xl border border-[#cbd5e1] bg-white px-4 text-sm font-medium text-[#111c2d] shadow-sm transition hover:bg-[#f8fafc] hover:border-[#94a3b8] active:bg-[#f1f5f9] disabled:opacity-60"
+        >
+          {isLoading ? (
+            <span className="flex items-center gap-2">
+              <svg
+                className="h-4 w-4 animate-spin text-[#0050cb]"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+              </svg>
+              Connecting...
+            </span>
+          ) : (
+            <>
+              <GoogleIcon className="absolute left-3.5 h-5 w-5 shrink-0" />
+              <span>{labelText}</span>
+            </>
+          )}
+        </button>
+
+        {/* Layer 2 (Interactive Overlay): Invisible Google iframe receiving clicks */}
+        {clientId && (
           <div
             ref={googleBtnContainerRef}
             data-testid="google-signin-btn"
-            className="flex w-full justify-center min-h-[44px]"
-          >
-            {!scriptLoaded && (
-              <button
-                type="button"
-                onClick={handleCustomClick}
-                disabled={isLoading}
-                className="flex h-11 w-full items-center justify-center gap-3 rounded-2xl border border-[#c2c6d8] bg-white px-4 text-sm font-medium text-[#111c2d] shadow-sm transition hover:bg-[#f9f9ff] active:bg-[#f0f3ff] disabled:opacity-60"
-              >
-                <GoogleIcon className="h-5 w-5 shrink-0" />
-                <span>{labelText}</span>
-              </button>
-            )}
-          </div>
-        ) : (
-          <button
-            type="button"
-            data-testid="google-signin-btn"
-            onClick={handleCustomClick}
-            disabled={isLoading}
-            className="flex h-11 w-full items-center justify-center gap-3 rounded-2xl border border-[#c2c6d8] bg-white px-4 text-sm font-medium text-[#111c2d] shadow-sm transition hover:bg-[#f9f9ff] active:bg-[#f0f3ff] disabled:opacity-60"
-          >
-            {isLoading ? (
-              <span className="flex items-center gap-2">
-                <svg
-                  className="h-4 w-4 animate-spin text-[#0050cb]"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                </svg>
-                Connecting...
-              </span>
-            ) : (
-              <>
-                <GoogleIcon className="h-5 w-5 shrink-0" />
-                <span>{labelText}</span>
-              </>
-            )}
-          </button>
+            className="absolute inset-0 z-10 flex w-full h-full items-center justify-center opacity-[0.0001] cursor-pointer overflow-hidden rounded-xl [&_iframe]:!w-full [&_iframe]:!h-full [&_iframe]:cursor-pointer"
+          />
         )}
       </div>
     </div>
