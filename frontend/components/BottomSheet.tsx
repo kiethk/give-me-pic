@@ -43,6 +43,18 @@ export function BottomSheet({
     const dragStartY = useRef(0);
     const [mounted, setMounted] = useState(false);
     const [visible, setVisible] = useState(false);
+    const [isDesktop, setIsDesktop] = useState(() => {
+        if (typeof window !== "undefined") {
+            return window.innerWidth >= 768;
+        }
+        return false;
+    });
+
+    useEffect(() => {
+        const check = () => setIsDesktop(window.innerWidth >= 768);
+        window.addEventListener("resize", check);
+        return () => window.removeEventListener("resize", check);
+    }, []);
 
     // Mount first, then animate in on next frame
     useEffect(() => {
@@ -111,15 +123,21 @@ export function BottomSheet({
 
     if (!mounted) return null;
 
-    const sheetStyle: React.CSSProperties = {
-        maxHeight: fullScreen ? "100dvh" : maxHeight,
-        transform: `translateY(${visible ? dragOffset : "100%"}px)`,
-        transition: isDragging ? "none" : "transform 0.35s cubic-bezier(0.32, 0.72, 0, 1)",
-    };
+    const sheetStyle: React.CSSProperties = isDesktop
+        ? {
+            opacity: visible ? 1 : 0,
+            transform: visible ? "scale(1)" : "scale(0.96)",
+            transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+        }
+        : {
+            maxHeight: fullScreen ? "100dvh" : maxHeight,
+            transform: `translateY(${visible ? dragOffset : "100%"}px)`,
+            transition: isDragging ? "none" : "transform 0.35s cubic-bezier(0.32, 0.72, 0, 1)",
+        };
 
     return (
         <div
-            className="fixed inset-0 z-[200] flex flex-col justify-end"
+            className="fixed inset-0 z-[200] flex flex-col justify-end md:justify-center md:items-center md:p-4"
             role="dialog"
             aria-modal="true"
         >
@@ -128,21 +146,21 @@ export function BottomSheet({
                 className="absolute inset-0 bg-black/50 backdrop-blur-sm"
                 style={{
                     opacity: visible ? 1 : 0,
-                    transition: "opacity 0.35s ease",
+                    transition: "opacity 0.25s ease",
                 }}
                 onClick={onClose}
                 aria-hidden="true"
             />
 
-            {/* Sheet */}
+            {/* Sheet / Dialog Container */}
             <div
                 ref={sheetRef}
-                className="relative z-10 flex flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl"
+                className="relative z-10 flex flex-col overflow-hidden rounded-t-3xl md:rounded-2xl bg-white shadow-2xl w-full md:max-w-lg md:max-h-[85vh]"
                 style={sheetStyle}
             >
                 {/* Drag handle / header */}
                 <div
-                    className="flex shrink-0 cursor-grab flex-col items-center gap-2 px-5 pb-3 pt-3 select-none touch-none"
+                    className="flex shrink-0 cursor-grab md:cursor-default flex-col items-center gap-2 px-5 pb-3 pt-3 select-none touch-none"
                     onTouchStart={handleTouchStart}
                     onTouchMove={handleTouchMove}
                     onTouchEnd={handleTouchEnd}
@@ -150,8 +168,8 @@ export function BottomSheet({
                     onPointerMove={handlePointerMove}
                     onPointerUp={handlePointerUp}
                 >
-                    {/* Pill handle */}
-                    <div className="h-1 w-10 rounded-full bg-[#c2c6d8]" />
+                    {/* Pill handle (mobile only) */}
+                    <div className="h-1 w-10 rounded-full bg-[#c2c6d8] md:hidden" />
                     {title && (
                         <div className="flex w-full items-center justify-between">
                             <h2 className="text-base font-semibold text-[#111c2d]">{title}</h2>

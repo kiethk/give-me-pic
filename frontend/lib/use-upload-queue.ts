@@ -54,9 +54,7 @@ interface UseUploadQueue {
 
 export function useUploadQueue(onUploadSuccess?: () => void): UseUploadQueue {
     const [queue, setQueue] = useState<QueuedUpload[]>([]);
-    const [isOnline, setIsOnline] = useState<boolean>(
-        typeof navigator !== "undefined" ? navigator.onLine : true,
-    );
+    const [isOnline, setIsOnline] = useState<boolean>(true);
     const [isProcessing, setIsProcessing] = useState(false);
     const [rateLimitMessage, setRateLimitMessage] = useState<string | null>(null);
     const processingRef = useRef(false); // guard against concurrent runs

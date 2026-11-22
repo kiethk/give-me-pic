@@ -180,18 +180,55 @@ export async function createSubject(payload: CreateSubjectInput) {
     });
 }
 
-export async function updateSubject(id: string, payload: { name: string; description?: string }) {
+export interface UpdateSubjectInput {
+    name: string;
+    description?: string;
+    colorHex?: string;
+    semester?: string;
+    archived?: boolean;
+}
+
+export async function updateSubject(id: string, payload: UpdateSubjectInput) {
     return request<Subject>(`/api/subjects/${id}`, {
         method: "PUT",
         body: payload,
     });
 }
 
-export async function archiveSubject(subjectId: string) {
+export async function deleteSubject(subjectId: string) {
     return request<void>(`/api/subjects/${subjectId}`, {
         method: "DELETE",
     });
 }
+
+export interface SuggestSubjectResponse {
+    matchedSubjectId: string | null;
+    suggestedName: string | null;
+    isNew: boolean;
+}
+
+export async function suggestSubject(file: File): Promise<SuggestSubjectResponse> {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+        const response = await fetch(`/api/subjects/suggest`, {
+            method: "POST",
+            credentials: "include",
+            body: formData,
+        });
+
+        if (!response.ok) {
+            return { matchedSubjectId: null, suggestedName: null, isNew: false };
+        }
+
+        return await response.json();
+    } catch {
+        return { matchedSubjectId: null, suggestedName: null, isNew: false };
+    }
+}
+
+export const archiveSubject = deleteSubject;
 
 // Media URLs from MinIO are already absolute (presigned URLs).
 // This is a passthrough — kept for safety in case relative URLs ever appear.

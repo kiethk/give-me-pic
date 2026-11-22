@@ -7,13 +7,16 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.UUID;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -62,6 +65,31 @@ class SubjectControllerIntegrationTests {
     }
 
     @Test
+    void authenticatedUserCanUpdateSubject() throws Exception {
+        Cookie accessCookie = registerUserAndGetAccessCookie();
+        MockHttpServletResponse createResponse = mockMvc.perform(post("/api/subjects")
+                        .cookie(accessCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Original Name\",\"colorHex\":\"#1F4D3A\"}"))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse();
+
+        String subjectId = createResponse.getContentAsString()
+                .replaceFirst(".*\\\"id\\\":\\\"([^\\\"]+)\\\".*", "$1");
+
+        mockMvc.perform(put("/api/subjects/" + subjectId)
+                        .cookie(accessCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Updated Name\",\"description\":\"New desc\",\"colorHex\":\"#0050CB\",\"semester\":\"2026-2\",\"archived\":false}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Updated Name"))
+                .andExpect(jsonPath("$.description").value("New desc"))
+                .andExpect(jsonPath("$.colorHex").value("#0050CB"))
+                .andExpect(jsonPath("$.semester").value("2026-2"));
+    }
+
+    @Test
     void deleteArchivesSubjectFromDefaultList() throws Exception {
         Cookie accessCookie = registerUserAndGetAccessCookie();
         MockHttpServletResponse createResponse = mockMvc.perform(post("/api/subjects")
@@ -81,6 +109,19 @@ class SubjectControllerIntegrationTests {
         mockMvc.perform(get("/api/subjects").cookie(accessCookie))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[?(@.id == '" + subjectId + "')]").isEmpty());
+    }
+
+    @Test
+    void authenticatedUserCanRequestSubjectSuggestion() throws Exception {
+        Cookie accessCookie = registerUserAndGetAccessCookie();
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "test.jpg", "image/jpeg", "fake image bytes".getBytes());
+
+        mockMvc.perform(multipart("/api/subjects/suggest")
+                        .file(file)
+                        .cookie(accessCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isNew").isBoolean());
     }
 
     private Cookie registerUserAndGetAccessCookie() throws Exception {
