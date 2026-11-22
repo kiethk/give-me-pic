@@ -17,7 +17,6 @@ app:
   media:
     max-file-size-bytes: ${MEDIA_MAX_FILE_SIZE_BYTES:20971520}
   ocr:
-    languages: ${TESSERACT_LANGUAGES:vie+eng}
     model: ${OCR_MODEL:gemini-3.1-flash-lite}
   embedding:
     gemini-api-key: ${GEMINI_API_KEY:}

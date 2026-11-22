@@ -28,5 +28,13 @@ frontend/.env*
 .DS_Store
 Thumbs.db
 
-# Logs
+# Logs and tool outputs
 *.log
+.vercel
+.env*
+graphify-out/
+graft/
+test-results/
+playwright-report/
+**/test-results/
+**/playwright-report/
