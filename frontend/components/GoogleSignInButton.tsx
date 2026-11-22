@@ -15,6 +15,7 @@ declare global {
             callback: (response: { credential?: string }) => void;
             auto_select?: boolean;
             cancel_on_tap_outside?: boolean;
+            use_fedcm_for_prompt?: boolean;
           }) => void;
           renderButton: (
             parent: HTMLElement,
@@ -28,7 +29,7 @@ declare global {
               width?: number | string;
             }
           ) => void;
-          prompt: () => void;
+          prompt: (notificationCallback?: (notification: unknown) => void) => void;
         };
       };
     };
@@ -113,6 +114,8 @@ export default function GoogleSignInButton({
         window.google.accounts.id.initialize({
           client_id: clientId,
           callback: handleCredentialResponse,
+          auto_select: false,
+          cancel_on_tap_outside: true,
         });
 
         const container = googleBtnContainerRef.current;
@@ -128,8 +131,6 @@ export default function GoogleSignInButton({
           shape: "rectangular",
           width: buttonWidth,
         });
-
-        window.google.accounts.id.prompt();
       }
     } catch (err) {
       console.warn("Failed to initialize Google Sign-In button:", err);
@@ -143,7 +144,7 @@ export default function GoogleSignInButton({
     }
 
     if (window.google?.accounts?.id) {
-      window.google.accounts.id.prompt();
+      window.google.accounts.id.prompt(() => {});
     } else {
       onError?.("Đang tải thư viện Google, vui lòng thử lại sau vài giây.");
     }
