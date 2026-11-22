@@ -28,21 +28,29 @@ public class RateLimitInterceptor implements HandlerInterceptor {
             actionType = RateLimitingService.ActionType.UPLOAD;
         } else if (uri.startsWith("/api/chat") && request.getMethod().equalsIgnoreCase("POST")) {
             actionType = RateLimitingService.ActionType.CHAT;
+        } else if (uri.equals("/api/auth/login") && request.getMethod().equalsIgnoreCase("POST")) {
+            actionType = RateLimitingService.ActionType.LOGIN;
         }
 
         if (actionType != null) {
-            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
-                return true; // Let auth filter handle unauthenticated requests
-            }
-            
-            // Assuming the principal is the userId (as set in JwtAuthFilter)
-            String userId = authentication.getName();
-            if (userId == null) {
-                return true;
+            String rateLimitKey;
+
+            if (actionType == RateLimitingService.ActionType.LOGIN) {
+                rateLimitKey = extractClientIp(request);
+            } else {
+                Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+                if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
+                    return true; // Let auth filter handle unauthenticated requests
+                }
+                
+                // Assuming the principal is the userId (as set in JwtAuthFilter)
+                rateLimitKey = authentication.getName();
+                if (rateLimitKey == null) {
+                    return true;
+                }
             }
 
-            Bucket bucket = rateLimitingService.resolveBucket(userId, actionType);
+            Bucket bucket = rateLimitingService.resolveBucket(rateLimitKey, actionType);
             ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
             
             if (!probe.isConsumed()) {
@@ -58,5 +66,17 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         }
         
         return true;
+    }
+
+    private String extractClientIp(HttpServletRequest request) {
+        String xForwardedFor = request.getHeader("X-Forwarded-For");
+        if (xForwardedFor != null && !xForwardedFor.isBlank()) {
+            return xForwardedFor.split(",")[0].trim();
+        }
+        String xRealIp = request.getHeader("X-Real-IP");
+        if (xRealIp != null && !xRealIp.isBlank()) {
+            return xRealIp.trim();
+        }
+        return request.getRemoteAddr();
     }
 }

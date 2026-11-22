@@ -14,7 +14,8 @@ public class RateLimitingService {
 
     public enum ActionType {
         UPLOAD,
-        CHAT
+        CHAT,
+        LOGIN
     }
 
     // Stores buckets per user per action type
@@ -36,6 +37,11 @@ public class RateLimitingService {
             case CHAT -> {
                 // 50 requests per hour
                 Bandwidth limit = Bandwidth.classic(50, Refill.intervally(50, Duration.ofHours(1)));
+                yield Bucket.builder().addLimit(limit).build();
+            }
+            case LOGIN -> {
+                // 5 requests per minute
+                Bandwidth limit = Bandwidth.classic(5, Refill.intervally(5, Duration.ofMinutes(1)));
                 yield Bucket.builder().addLimit(limit).build();
             }
         };

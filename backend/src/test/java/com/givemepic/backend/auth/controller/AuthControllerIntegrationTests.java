@@ -141,4 +141,25 @@ class AuthControllerIntegrationTests {
                                     org.hamcrest.Matchers.containsString("refresh_token=")));
                 });
     }
+
+    @Test
+    void loginRateLimitingReturns429AfterExceedingThreshold() throws Exception {
+        String clientIp = "198.51.100." + (int) (Math.random() * 200 + 1);
+
+        for (int i = 0; i < 5; i++) {
+            mockMvc.perform(post("/api/auth/login")
+                            .header("X-Forwarded-For", clientIp)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"email\":\"rate-limit@example.com\",\"password\":\"wrong\"}"))
+                    .andExpect(status().isUnauthorized());
+        }
+
+        // 6th request from the same IP must be rate limited (429)
+        mockMvc.perform(post("/api/auth/login")
+                        .header("X-Forwarded-For", clientIp)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"rate-limit@example.com\",\"password\":\"wrong\"}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.message").value("Too many requests. Please try again later."));
+    }
 }
