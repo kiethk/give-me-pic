@@ -66,6 +66,60 @@ public class MediaService {
                 .toList();
     }
 
+    @Transactional
+    public MediaResponse upload(UUID userId, UUID subjectId, String caption, UUID clientUploadId, MultipartFile file) {
+        if (clientUploadId != null) {
+            Optional<Media> existing = mediaRepository.findByUserIdAndClientUploadId(userId, clientUploadId);
+            if (existing.isPresent()) {
+                String downloadUrl = objectStorageService.createDownloadUrl(existing.get().getStoragePath());
+                return MediaResponse.from(existing.get(), downloadUrl);
+            }
+        }
+
+        validateSubjectOwnership(userId, subjectId);
+        if (file == null || file.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "File không được để trống");
+        }
+        if (file.getContentType() == null || !file.getContentType().startsWith("image/")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Chỉ hỗ trợ file hình ảnh");
+        }
+        if (file.getSize() > maxFileSizeBytes) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ảnh vượt quá dung lượng cho phép");
+        }
+        String originalName = Objects.requireNonNullElse(file.getOriginalFilename(), "upload");
+        String objectKey = generateObjectKey(userId, subjectId, originalName);
+        String storedName = objectKey.substring(objectKey.lastIndexOf('/') + 1);
+        try {
+            objectStorageService.store(objectKey, file);
+            Media media = Media.builder()
+                    .userId(userId)
+                    .subjectId(subjectId)
+                    .fileName(originalName)
+                    .storedName(storedName)
+                    .contentType(file.getContentType())
+                    .sizeBytes(file.getSize())
+                    .caption(caption)
+                    .storagePath(objectKey)
+                    .url(objectKey)
+                    .clientUploadId(clientUploadId)
+                    .build();
+            Media savedMedia = mediaRepository.save(media);
+            eventPublisher.publishEvent(new MediaUploadedEvent(savedMedia.getId()));
+            return MediaResponse.from(savedMedia, imageProxyUrl(savedMedia.getId()));
+        } catch (org.springframework.dao.DataIntegrityViolationException ex) {
+            if (clientUploadId != null) {
+                Optional<Media> existing = mediaRepository.findByUserIdAndClientUploadId(userId, clientUploadId);
+                if (existing.isPresent()) {
+                    String downloadUrl = objectStorageService.createDownloadUrl(existing.get().getStoragePath());
+                    return MediaResponse.from(existing.get(), downloadUrl);
+                }
+            }
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Client upload ID conflict", ex);
+        } catch (RuntimeException ex) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Không thể lưu file vào storage", ex);
+        }
+    }
+
     public String generateObjectKey(UUID userId, UUID subjectId, String originalName) {
         validateSubjectOwnership(userId, subjectId);
         String sanitizedName = originalName.replace("\\", "/");

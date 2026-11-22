@@ -29,6 +29,9 @@ public class ChatService {
     private final LlmProvider llmProvider;
     private final ObjectStorageService storageService;
 
+    // Chunks with cosine distance above this threshold are deemed irrelevant
+    private static final double RELEVANCE_THRESHOLD = 0.72;
+
     /**
      * Performs a vector similarity search (cosine distance) on chunk_embeddings.
      * If subjectId is provided, filters the search results to that specific
@@ -86,11 +89,16 @@ public class ChatService {
                     """, sessionId, userId, request.subjectId());
         }
 
-        List<SimilaritySearchResponse> chunks = search(userId, request.question(), request.subjectId(), 5);
+        List<SimilaritySearchResponse> allChunks = search(userId, request.question(), request.subjectId(), 5);
+        List<SimilaritySearchResponse> chunks = allChunks.stream()
+                .filter(c -> c.distance() <= RELEVANCE_THRESHOLD)
+                .toList();
 
-        String context = chunks.stream()
-                .map(SimilaritySearchResponse::content)
-                .collect(Collectors.joining("\n---\n"));
+        String context = chunks.isEmpty()
+                ? "(Không tìm thấy ghi chú bài giảng nào liên quan đến câu hỏi này)"
+                : chunks.stream()
+                        .map(SimilaritySearchResponse::content)
+                        .collect(Collectors.joining("\n---\n"));
 
         String prompt = """
                 Bạn là trợ lý học tập. Dựa vào các đoạn ghi chú bài giảng sau đây,
@@ -133,7 +141,7 @@ public class ChatService {
                         c.chunkId(),
                         c.mediaId(),
                         c.fileName(),
-                        storageService.createDownloadUrl(c.storagePath()),
+                        "/api/media/" + c.mediaId() + "/image",
                         c.distance()))
                 .collect(Collectors.toList());
 
@@ -211,7 +219,7 @@ public class ChatService {
                 UUID.fromString(rs.getString("chunk_id")),
                 UUID.fromString(rs.getString("media_id")),
                 rs.getString("file_name"),
-                storageService.createDownloadUrl(rs.getString("storage_path")),
+                "/api/media/" + rs.getString("media_id") + "/image",
                 rs.getDouble("similarity_score")), messageId);
     }
 

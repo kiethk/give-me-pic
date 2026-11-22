@@ -41,6 +41,17 @@ public class MediaController {
         return ResponseEntity.ok(mediaService.list(userId));
     }
 
+    @PostMapping("/upload")
+    public ResponseEntity<MediaResponse> upload(
+            @AuthenticationPrincipal UUID userId,
+            @RequestParam UUID subjectId,
+            @RequestParam(required = false) String caption,
+            @RequestParam(required = false) UUID clientUploadId,
+            @RequestParam("file") MultipartFile file) {
+        MediaResponse response = mediaService.upload(userId, subjectId, caption, clientUploadId, file);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
     @GetMapping("/presigned-url")
     public ResponseEntity<Map<String, String>> getPresignedUrl(
             @AuthenticationPrincipal UUID userId,

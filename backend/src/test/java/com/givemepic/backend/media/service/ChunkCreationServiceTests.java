@@ -35,7 +35,7 @@ class ChunkCreationServiceTests {
 
     @Test
     void splitKeepsLinesTogetherUntilCharacterLimit() {
-        List<String> chunks = chunkCreationService.split("First line.\nSecond line.", 30);
+        List<String> chunks = chunkCreationService.split("First line.\nSecond line.", 20);
 
         assertEquals(2, chunks.size());
         assertEquals("First line.", chunks.get(0));
