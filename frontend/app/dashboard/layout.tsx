@@ -345,7 +345,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <BottomSheet
                     open={showCaptureSheet}
                     onClose={() => setShowCaptureSheet(false)}
-                    title="Thêm bài học mới"
+                    title="Add new note"
                 >
                     <div className="space-y-3 px-5 py-4 pb-6">
                         <button
@@ -359,8 +359,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                 <IconCamera className="h-6 w-6" />
                             </div>
                             <div className="min-w-0 flex-1">
-                                <p className="text-[15px] font-semibold text-[#111c2d]">Chụp ảnh ngay</p>
-                                <p className="text-xs text-[#727687]">Mở máy ảnh chụp trực tiếp bảng viết hoặc bài giảng</p>
+                                <p className="text-[15px] font-semibold text-[#111c2d]">Take photo</p>
+                                <p className="text-xs text-[#727687]">Open camera to capture whiteboard or notes directly</p>
                             </div>
                             <svg className="h-5 w-5 shrink-0 text-[#727687]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <polyline points="9 18 15 12 9 6" />
@@ -378,8 +378,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                 <IconUpload active={true} />
                             </div>
                             <div className="min-w-0 flex-1">
-                                <p className="text-[15px] font-semibold text-[#111c2d]">Chọn từ thư viện</p>
-                                <p className="text-xs text-[#727687]">Tải lên một hoặc nhiều ảnh đã có sẵn trong máy</p>
+                                <p className="text-[15px] font-semibold text-[#111c2d]">Choose from library</p>
+                                <p className="text-xs text-[#727687]">Upload one or more photos from your device</p>
                             </div>
                             <svg className="h-5 w-5 shrink-0 text-[#727687]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <polyline points="9 18 15 12 9 6" />
@@ -397,7 +397,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <nav className="md:hidden shrink-0 h-[72px] bg-white border-t border-[#e2e8f0] flex items-center justify-around px-4 pb-[env(safe-area-inset-bottom)] z-40">
                     <Link href="/dashboard/chat" className="flex flex-col items-center gap-1 p-2 text-[#727687] min-w-[64px]">
                         <IconChat active={isActive('/dashboard/chat')} />
-                        <span className={`text-[10px] font-medium ${isActive('/dashboard/chat') ? 'text-[#0050cb]' : ''}`}>Hỏi AI</span>
+                        <span className={`text-[10px] font-medium ${isActive('/dashboard/chat') ? 'text-[#0050cb]' : ''}`}>Ask AI</span>
                     </Link>
 
                     {/* Camera FAB */}
@@ -405,7 +405,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         <button
                             type="button"
                             onClick={() => setShowCaptureSheet(true)}
-                            aria-label="Chụp ảnh hoặc tải lên"
+                            aria-label="Take photo or upload"
                             className="flex h-14 w-14 items-center justify-center rounded-full bg-[#0050cb] shadow-[0_8px_16px_rgba(0,80,203,0.3)] text-white hover:bg-[#0066ff] transition-transform active:scale-95"
                         >
                             <IconCamera className="w-7 h-7" />
@@ -414,7 +414,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
                     <Link href="/dashboard" className="flex flex-col items-center gap-1 p-2 text-[#727687] min-w-[64px]">
                         <IconGrid active={isActive('/dashboard')} />
-                        <span className={`text-[10px] font-medium ${isActive('/dashboard') ? 'text-[#0050cb]' : ''}`}>Môn học</span>
+                        <span className={`text-[10px] font-medium ${isActive('/dashboard') ? 'text-[#0050cb]' : ''}`}>Subjects</span>
                     </Link>
                 </nav>
             </div>

@@ -35,11 +35,11 @@ export default function ProfilePage() {
 
         // Validate
         if (!file.type.startsWith("image/")) {
-            setError("Vui lòng chọn file ảnh (JPG, PNG, WebP...)");
+            setError("Please select an image file (JPG, PNG, WebP...)");
             return;
         }
         if (file.size > 5 * 1024 * 1024) {
-            setError("Ảnh quá lớn. Tối đa 5MB.");
+            setError("Image is too large. Maximum 5MB.");
             return;
         }
 
@@ -55,9 +55,9 @@ export default function ProfilePage() {
             setProfile(updatedProfile);
             setAvatarUrl(updatedProfile.avatarUrl || "");
             setPreviewUrl(updatedProfile.avatarUrl || "");
-            setSuccessMsg("Đã upload ảnh đại diện thành công!");
+            setSuccessMsg("Avatar uploaded successfully!");
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Upload thất bại. Thử lại nhé.");
+            setError(err instanceof Error ? err.message : "Upload failed. Please try again.");
             setPreviewUrl(profile?.avatarUrl || ""); // revert preview
         } finally {
             setIsUploading(false);
@@ -70,7 +70,7 @@ export default function ProfilePage() {
         e.preventDefault();
         const trimmed = displayName.trim();
         if (!trimmed) {
-            setError("Tên không được để trống");
+            setError("Name cannot be blank");
             return;
         }
 
@@ -84,9 +84,9 @@ export default function ProfilePage() {
                 avatarUrl: avatarUrl || undefined,
             });
             setProfile(updated);
-            setSuccessMsg("Cập nhật thông tin thành công! ✓");
+            setSuccessMsg("Profile updated successfully! ✓");
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Có lỗi xảy ra khi lưu.");
+            setError(err instanceof Error ? err.message : "An error occurred while saving.");
         } finally {
             setIsSaving(false);
         }
@@ -191,7 +191,7 @@ export default function ProfilePage() {
                     {isUploading && (
                         <div className="mt-4 flex items-center gap-2 rounded-lg bg-[#f0f3ff] px-3 py-2.5 text-[13px] text-[#424656]">
                             <div className="h-4 w-4 rounded-full border-2 border-[#0050cb] border-t-transparent animate-spin shrink-0" />
-                            Đang tải lên hệ thống…
+                            Uploading…
                         </div>
                     )}
                     {avatarUrl && !isUploading && avatarUrl !== (profile?.avatarUrl || "") && (
@@ -199,7 +199,7 @@ export default function ProfilePage() {
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
                                 <polyline points="20 6 9 17 4 12"/>
                             </svg>
-                            Ảnh đã upload thành công! Nhấn &quot;Save&quot; để lưu.
+                            Image uploaded successfully! Click &quot;Save&quot; to apply.
                         </div>
                     )}
 
@@ -211,7 +211,7 @@ export default function ProfilePage() {
                         onChange={handleFileChange}
                     />
                     <p className="mt-3 text-[11px] text-[#727687]">
-                        JPG, PNG, WebP · Tối đa 5MB · Tỷ lệ 1:1 tốt nhất
+                        JPG, PNG, WebP · Max 5MB · 1:1 aspect ratio recommended
                     </p>
                 </div>
 

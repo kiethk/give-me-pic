@@ -76,7 +76,7 @@ public class AwsS3StorageService implements ObjectStorageService {
 
             s3Client.putObject(putObjectRequest, RequestBody.fromBytes(file.getBytes()));
         } catch (Exception ex) {
-            throw new IllegalStateException("Không thể upload object lên S3 Storage", ex);
+            throw new IllegalStateException("Could not upload object to S3 Storage", ex);
         }
     }
 
@@ -90,7 +90,7 @@ public class AwsS3StorageService implements ObjectStorageService {
 
             s3Client.deleteObject(deleteObjectRequest);
         } catch (Exception ex) {
-            throw new IllegalStateException("Không thể xóa object khỏi S3 Storage", ex);
+            throw new IllegalStateException("Could not delete object from S3 Storage", ex);
         }
     }
 
@@ -104,7 +104,7 @@ public class AwsS3StorageService implements ObjectStorageService {
 
             return s3Client.getObjectAsBytes(getObjectRequest).asByteArray();
         } catch (Exception ex) {
-            throw new IllegalStateException("Không thể tải object từ S3 Storage", ex);
+            throw new IllegalStateException("Could not download object from S3 Storage", ex);
         }
     }
 
@@ -130,7 +130,7 @@ public class AwsS3StorageService implements ObjectStorageService {
             }
             return url;
         } catch (Exception ex) {
-            throw new IllegalStateException("Không thể tạo download URL từ S3 Storage", ex);
+            throw new IllegalStateException("Could not create download URL from S3 Storage", ex);
         }
     }
 
@@ -158,7 +158,7 @@ public class AwsS3StorageService implements ObjectStorageService {
             }
             return url;
         } catch (Exception ex) {
-            throw new IllegalStateException("Không thể tạo upload URL từ S3 Storage", ex);
+            throw new IllegalStateException("Could not create upload URL from S3 Storage", ex);
         }
     }
 

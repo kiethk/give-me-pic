@@ -65,6 +65,6 @@ public class SubjectService {
 
     private Subject findOwnedSubject(UUID userId, UUID subjectId) {
         return subjectRepository.findByIdAndUserId(subjectId, userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy môn học"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Subject not found"));
     }
 }

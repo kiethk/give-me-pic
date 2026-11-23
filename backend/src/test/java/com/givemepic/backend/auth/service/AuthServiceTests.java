@@ -103,7 +103,7 @@ class AuthServiceTests {
         // Act & Assert
         assertThatThrownBy(() -> authService.register(request))
                 .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("Email đã được sử dụng");
+                .hasMessageContaining("Email is already in use");
 
         verify(userRepository, never()).save(any(User.class));
     }
@@ -141,7 +141,7 @@ class AuthServiceTests {
         // Act & Assert
         assertThatThrownBy(() -> authService.login(request))
                 .isInstanceOf(BadCredentialsException.class)
-                .hasMessage("Email hoặc mật khẩu không đúng");
+                .hasMessage("Invalid email or password");
     }
 
     @Test
@@ -154,7 +154,7 @@ class AuthServiceTests {
         // Act & Assert
         assertThatThrownBy(() -> authService.login(request))
                 .isInstanceOf(BadCredentialsException.class)
-                .hasMessage("Email hoặc mật khẩu không đúng");
+                .hasMessage("Invalid email or password");
     }
 
     @Test
@@ -326,6 +326,6 @@ class AuthServiceTests {
         // Act & Assert
         assertThatThrownBy(() -> authService.login(request))
                 .isInstanceOf(BadCredentialsException.class)
-                .hasMessage("Email hoặc mật khẩu không đúng");
+                .hasMessage("Invalid email or password");
     }
 }

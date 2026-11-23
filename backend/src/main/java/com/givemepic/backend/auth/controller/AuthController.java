@@ -15,6 +15,7 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
 import java.util.UUID;
@@ -59,7 +60,7 @@ public class AuthController {
     @PostMapping("/avatar")
     public ResponseEntity<UserProfileResponse> uploadAvatar(
             @AuthenticationPrincipal UUID userId,
-            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+            @RequestParam("file") MultipartFile file) {
         return ResponseEntity.ok(authService.uploadAvatar(userId, file));
     }
 

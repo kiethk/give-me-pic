@@ -52,7 +52,7 @@ public class GeminiEmbeddingProvider implements EmbeddingProvider {
     @SuppressWarnings("unchecked")
     public List<Float> embed(String text) {
         if (apiKey.isBlank()) {
-            throw new IllegalStateException("Chưa cấu hình GEMINI_API_KEY");
+            throw new IllegalStateException("GEMINI_API_KEY is not configured");
         }
 
         HttpClientErrorException lastException = null;
@@ -61,7 +61,7 @@ public class GeminiEmbeddingProvider implements EmbeddingProvider {
                 return doEmbed(text);
             } catch (HttpClientErrorException e) {
                 if (e.getStatusCode().value() != 429) {
-                    // Non-rate-limit error — không retry, ném ngay
+                    // Non-rate-limit error — do not retry, throw immediately
                     throw e;
                 }
                 lastException = e;
@@ -75,7 +75,7 @@ public class GeminiEmbeddingProvider implements EmbeddingProvider {
                 }
             }
         }
-        throw new IllegalStateException("Gemini embedding vẫn trả 429 sau " + MAX_RETRIES + " lần retry", lastException);
+        throw new IllegalStateException("Gemini embedding failed with 429 after " + MAX_RETRIES + " retries", lastException);
     }
 
     // ---------------------------------------------------------------------------
@@ -98,7 +98,7 @@ public class GeminiEmbeddingProvider implements EmbeddingProvider {
         Map<String, Object> embedding = (Map<String, Object>) response.get("embedding");
         List<Number> values = (List<Number>) embedding.get("values");
         if (values.size() != outputDimensionality) {
-            throw new IllegalStateException("Embedding dimension không đúng: " + values.size());
+            throw new IllegalStateException("Invalid embedding dimension: " + values.size());
         }
         return values.stream().map(Number::floatValue).toList();
     }

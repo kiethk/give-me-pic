@@ -84,7 +84,7 @@ export default function GoogleSignInButton({
   const handleCredentialResponse = useCallback(
     async (response: { credential?: string }) => {
       if (!response.credential) {
-        onError?.("Không nhận được token xác thực từ Google.");
+        onError?.("Did not receive authentication token from Google.");
         return;
       }
 
@@ -97,7 +97,7 @@ export default function GoogleSignInButton({
           router.push("/dashboard/chat");
         }
       } catch (err) {
-        onError?.(err instanceof Error ? err.message : "Đăng nhập với Google thất bại.");
+        onError?.(err instanceof Error ? err.message : "Google Sign-In failed.");
       } finally {
         setIsLoading(false);
       }
@@ -145,44 +145,45 @@ export default function GoogleSignInButton({
           src="https://accounts.google.com/gsi/client"
           strategy="afterInteractive"
           onLoad={() => setScriptLoaded(true)}
-          onError={() => onError?.("Không thể tải dịch vụ Google Identity Services.")}
+          onError={() => onError?.("Could not load Google Identity Services.")}
         />
       )}
 
-      <div className="flex w-full justify-center">
-        {/* Outer wrapper enforcing rounded-xl, 44px height, matching Sign In button */}
-        <div className="group relative flex h-11 w-full items-center justify-center overflow-hidden rounded-xl border border-[#cbd5e1] bg-white shadow-sm transition hover:border-[#94a3b8] hover:bg-[#f8fafc]">
-          {isLoading ? (
-            <span className="flex items-center gap-2 text-sm font-medium text-[#111c2d]">
-              <svg
-                className="h-4 w-4 animate-spin text-[#0050cb]"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-              </svg>
-              Connecting...
-            </span>
-          ) : (
-            <div
-              ref={googleBtnContainerRef}
-              data-testid="google-signin-btn"
-              className="flex h-full w-full items-center justify-center scale-y-[1.18] scale-x-[1.02] translate-x-1 origin-center [&_iframe]:!w-full [&_iframe]:!h-full [&>div]:!w-full [&>div]:!h-full"
+      {/* ── Native Mobile App Style Button with Invisible Google Click Target ── */}
+      <div className="relative flex h-10 w-full items-center justify-center overflow-hidden rounded-lg border border-slate-300 bg-white px-4 shadow-sm transition hover:bg-slate-50 active:scale-[0.99] cursor-pointer">
+        {isLoading ? (
+          <span className="flex items-center gap-2 text-sm font-medium text-slate-700">
+            <svg
+              className="h-4 w-4 animate-spin text-[#0050cb]"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             >
-              {/* Fallback before Google script renders */}
-              {!scriptLoaded && (
-                <div className="flex h-full w-full items-center justify-center gap-3 px-4 text-sm font-medium text-[#111c2d]">
-                  <GoogleIcon className="h-5 w-5 shrink-0" />
-                  <span>Continue with Google</span>
-                </div>
-              )}
+              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+            </svg>
+            Connecting...
+          </span>
+        ) : (
+          <>
+            {/* Native visible UI: clean Google logo + clean text */}
+            <div className="pointer-events-none flex items-center justify-center gap-2.5 text-sm font-medium text-slate-700">
+              <GoogleIcon className="h-5 w-5 shrink-0" />
+              <span>Continue with Google</span>
             </div>
-          )}
-        </div>
+
+            {/* Invisible Google GIS Click Target on top */}
+            {clientId && (
+              <div
+                ref={googleBtnContainerRef}
+                data-testid="google-signin-btn"
+                className="absolute inset-0 z-10 flex h-full w-full items-center justify-center opacity-[0.001] cursor-pointer overflow-hidden [&_iframe]:!h-full [&_iframe]:!w-full [&_iframe]:!cursor-pointer [&>div]:!h-full [&>div]:!w-full"
+              />
+            )}
+          </>
+        )}
       </div>
     </div>
   );

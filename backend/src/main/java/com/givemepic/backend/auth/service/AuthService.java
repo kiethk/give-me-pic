@@ -41,12 +41,12 @@ public class AuthService {
     private final ObjectStorageService storageService;
     private final GoogleTokenVerifier googleTokenVerifier;
 
-    private static final long REFRESH_TOKEN_EXPIRATION_MS = 604_800_000L; // 7 ngày
+    private static final long REFRESH_TOKEN_EXPIRATION_MS = 604_800_000L; // 7 days
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
         if (userRepository.existsByEmail(request.email())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Email đã được sử dụng");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Email is already in use");
         }
 
         User user = User.builder()
@@ -63,10 +63,10 @@ public class AuthService {
     @Transactional
     public AuthResponse login(LoginRequest request) {
         User user = userRepository.findByEmail(request.email())
-                .orElseThrow(() -> new BadCredentialsException("Email hoặc mật khẩu không đúng"));
+                .orElseThrow(() -> new BadCredentialsException("Invalid email or password"));
 
         if (user.getPasswordHash() == null || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
-            throw new BadCredentialsException("Email hoặc mật khẩu không đúng");
+            throw new BadCredentialsException("Invalid email or password");
         }
 
         return buildAuthResponse(user);
@@ -123,7 +123,7 @@ public class AuthService {
     @Transactional(readOnly = true)
     public UserProfileResponse getProfile(UUID userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy người dùng"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
         return new UserProfileResponse(user.getId(), user.getEmail(), user.getDisplayName(), user.getAvatarUrl(), user.getSubscriptionTier());
     }
@@ -131,7 +131,7 @@ public class AuthService {
     @Transactional
     public UserProfileResponse updateProfile(UUID userId, UpdateProfileRequest request) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy người dùng"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
         user.setDisplayName(request.displayName());
         user.setAvatarUrl(request.avatarUrl());
@@ -143,7 +143,7 @@ public class AuthService {
     @Transactional
     public UserProfileResponse uploadAvatar(UUID userId, MultipartFile file) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy người dùng"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
         String extension = StringUtils.getFilenameExtension(file.getOriginalFilename());
         String objectKey = "avatars/" + userId + "/" + UUID.randomUUID() + (extension != null ? "." + extension : "");
@@ -187,7 +187,7 @@ public class AuthService {
             byte[] hash = digest.digest(rawToken.getBytes(StandardCharsets.UTF_8));
             return Base64.getEncoder().encodeToString(hash);
         } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("Không thể hash refresh token", e);
+            throw new RuntimeException("Unable to hash refresh token", e);
         }
     }
 }

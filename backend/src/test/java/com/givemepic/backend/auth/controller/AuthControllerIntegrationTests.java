@@ -16,6 +16,8 @@ import com.givemepic.backend.auth.dto.GoogleTokenPayload;
 
 import java.util.UUID;
 
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -123,7 +125,7 @@ class AuthControllerIntegrationTests {
 
         Cookie accessCookie = registerResponse.getCookie("access_token");
 
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/auth/me")
+        mockMvc.perform(get("/api/auth/me")
                         .cookie(accessCookie))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value(email))
@@ -132,7 +134,7 @@ class AuthControllerIntegrationTests {
 
     @Test
     void meRejectsRequestWithoutCookie() throws Exception {
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/auth/me"))
+        mockMvc.perform(get("/api/auth/me"))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -212,8 +214,8 @@ class AuthControllerIntegrationTests {
 
     @Test
     void googleLoginRejectsInvalidGoogleToken() throws Exception {
-        org.mockito.Mockito.when(googleTokenVerifier.verify("invalid-token"))
-                .thenThrow(new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Google ID token không hợp lệ hoặc đã hết hạn"));
+        when(googleTokenVerifier.verify("invalid-token"))
+                .thenThrow(new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Google ID token is invalid or has expired"));
 
         mockMvc.perform(post("/api/auth/google")
                         .contentType(MediaType.APPLICATION_JSON)

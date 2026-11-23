@@ -32,7 +32,7 @@ public class GoogleTokenVerifierImpl implements GoogleTokenVerifier {
     @Override
     public GoogleTokenPayload verify(String idToken) {
         if (!StringUtils.hasText(idToken)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ID token không được để trống");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ID token must not be blank");
         }
 
         GoogleTokenPayload payload;
@@ -46,27 +46,27 @@ public class GoogleTokenVerifierImpl implements GoogleTokenVerifier {
                     .body(GoogleTokenPayload.class);
         } catch (Exception e) {
             log.warn("Failed to verify Google ID token: {}", e.getMessage());
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Google ID token không hợp lệ hoặc đã hết hạn");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Google ID token is invalid or has expired");
         }
 
         if (payload == null || !StringUtils.hasText(payload.sub()) || !StringUtils.hasText(payload.email())) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Google token không chứa thông tin hợp lệ");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Google token contains invalid payload");
         }
 
         if (!payload.isEmailVerified()) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Email Google chưa được xác thực");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Google email is not verified");
         }
 
         if (!StringUtils.hasText(payload.iss())
                 || (!"accounts.google.com".equals(payload.iss()) && !"https://accounts.google.com".equals(payload.iss()))) {
             log.warn("Google token invalid issuer: {}", payload.iss());
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Issuer của Google token không hợp lệ");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Google token issuer is invalid");
         }
 
         String trimmedExpectedClientId = StringUtils.hasText(expectedClientId) ? expectedClientId.trim() : null;
         if (StringUtils.hasText(trimmedExpectedClientId) && !trimmedExpectedClientId.equals(payload.aud())) {
             log.warn("Google token audience mismatch: expected {} but got {}", trimmedExpectedClientId, payload.aud());
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Google token không thuộc về ứng dụng này");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Google token does not belong to this application");
         }
 
         return payload;

@@ -36,15 +36,15 @@ class SubjectSuggestionServiceTests {
         UUID existingId = UUID.randomUUID();
         Subject existing = Subject.builder()
                 .id(existingId)
-                .name("Kinh tế quốc tế")
+                .name("International Economics")
                 .build();
 
-        String rawJson = "{\"matchedSubjectId\": \"" + existingId + "\", \"suggestedName\": \"Kinh tế quốc tế\", \"isNew\": false}";
+        String rawJson = "{\"matchedSubjectId\": \"" + existingId + "\", \"suggestedName\": \"International Economics\", \"isNew\": false}";
 
         SuggestSubjectResponse res = service.parseGeminiResponse(rawJson, List.of(existing));
 
         assertThat(res.matchedSubjectId()).isEqualTo(existingId);
-        assertThat(res.suggestedName()).isEqualTo("Kinh tế quốc tế");
+        assertThat(res.suggestedName()).isEqualTo("International Economics");
         assertThat(res.isNew()).isFalse();
     }
 
@@ -53,33 +53,33 @@ class SubjectSuggestionServiceTests {
         UUID existingId = UUID.randomUUID();
         Subject existing = Subject.builder()
                 .id(existingId)
-                .name("Kinh tế quốc tế")
+                .name("International Economics")
                 .build();
 
-        String rawJson = "{\"matchedSubjectId\": null, \"suggestedName\": \"Toán giải tích 1\", \"isNew\": true}";
+        String rawJson = "{\"matchedSubjectId\": null, \"suggestedName\": \"Calculus 1\", \"isNew\": true}";
 
         SuggestSubjectResponse res = service.parseGeminiResponse(rawJson, List.of(existing));
 
         assertThat(res.matchedSubjectId()).isNull();
-        assertThat(res.suggestedName()).isEqualTo("Toán giải tích 1");
+        assertThat(res.suggestedName()).isEqualTo("Calculus 1");
         assertThat(res.isNew()).isTrue();
     }
 
     @Test
     void parseGeminiResponse_handlesMarkdownCodeBlock() {
-        String rawJson = "```json\n{\"matchedSubjectId\": null, \"suggestedName\": \"Lập trình mạng\", \"isNew\": true}\n```";
+        String rawJson = "```json\n{\"matchedSubjectId\": null, \"suggestedName\": \"Computer Networks\", \"isNew\": true}\n```";
 
         SuggestSubjectResponse res = service.parseGeminiResponse(rawJson, List.of());
 
         assertThat(res.matchedSubjectId()).isNull();
-        assertThat(res.suggestedName()).isEqualTo("Lập trình mạng");
+        assertThat(res.suggestedName()).isEqualTo("Computer Networks");
         assertThat(res.isNew()).isTrue();
     }
 
     @Test
     void parseGeminiResponse_unrecognizedSubjectIdIsTreatedAsNew() {
         UUID randomOtherId = UUID.randomUUID();
-        String rawJson = "{\"matchedSubjectId\": \"" + randomOtherId + "\", \"suggestedName\": \"Vật lý đại cương\", \"isNew\": false}";
+        String rawJson = "{\"matchedSubjectId\": \"" + randomOtherId + "\", \"suggestedName\": \"General Physics\", \"isNew\": false}";
 
         SuggestSubjectResponse res = service.parseGeminiResponse(rawJson, List.of());
 

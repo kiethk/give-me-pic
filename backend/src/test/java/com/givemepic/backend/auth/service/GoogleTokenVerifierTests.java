@@ -35,7 +35,7 @@ class GoogleTokenVerifierTests {
         assertThatThrownBy(() -> verifier.verify(""))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasFieldOrPropertyWithValue("status", HttpStatus.BAD_REQUEST)
-                .hasMessageContaining("ID token không được để trống");
+                .hasMessageContaining("ID token must not be blank");
     }
 
     @Test
@@ -49,7 +49,7 @@ class GoogleTokenVerifierTests {
         assertThatThrownBy(() -> verifier.verify("some-token"))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasFieldOrPropertyWithValue("status", HttpStatus.UNAUTHORIZED)
-                .hasMessageContaining("Google ID token không hợp lệ hoặc đã hết hạn");
+                .hasMessageContaining("Google ID token is invalid or has expired");
     }
 
     @Test
@@ -74,7 +74,7 @@ class GoogleTokenVerifierTests {
         assertThatThrownBy(() -> verifier.verify("some-token"))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasFieldOrPropertyWithValue("status", HttpStatus.UNAUTHORIZED)
-                .hasMessageContaining("Email Google chưa được xác thực");
+                .hasMessageContaining("Google email is not verified");
     }
 
     @Test
@@ -99,7 +99,7 @@ class GoogleTokenVerifierTests {
         assertThatThrownBy(() -> verifier.verify("some-token"))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasFieldOrPropertyWithValue("status", HttpStatus.UNAUTHORIZED)
-                .hasMessageContaining("Google token không thuộc về ứng dụng này");
+                .hasMessageContaining("Google token does not belong to this application");
     }
 
     @Test
@@ -124,7 +124,7 @@ class GoogleTokenVerifierTests {
         assertThatThrownBy(() -> verifier.verify("some-token"))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasFieldOrPropertyWithValue("status", HttpStatus.UNAUTHORIZED)
-                .hasMessageContaining("Issuer của Google token không hợp lệ");
+                .hasMessageContaining("Google token issuer is invalid");
     }
 
     @Test

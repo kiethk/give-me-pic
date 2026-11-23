@@ -42,11 +42,11 @@ public class GeminiVisionOcrEngine implements OcrEngine {
     private static final int MAX_DIMENSION_PX = 1200;
 
     private static final String OCR_PROMPT =
-            "Hãy trích xuất toàn bộ văn bản trong bức ảnh này. " +
-            "Trình bày lại dưới định dạng Markdown, giữ nguyên cấu trúc tiêu đề, danh sách, " +
-            "và bảng biểu nếu có. " +
-            "Tuyệt đối không thêm bất kỳ câu chào hỏi hay bình luận nào của AI, " +
-            "chỉ trả về nội dung trích xuất.";
+            "Extract all text from this image. " +
+            "Format the output as clean Markdown, preserving headers, lists, " +
+            "and tables if present. " +
+            "Do not include any introductory remarks, conversational greetings, or AI commentary; " +
+            "return only the extracted text content.";
 
     private final RestClient restClient;
     private final String apiKey;
@@ -76,7 +76,7 @@ public class GeminiVisionOcrEngine implements OcrEngine {
     @Override
     public String extractText(byte[] content, String contentType, String fileName) {
         if (apiKey == null || apiKey.isBlank()) {
-            throw new IllegalStateException("Chưa cấu hình GEMINI_API_KEY cho OCR");
+            throw new IllegalStateException("GEMINI_API_KEY is not configured for OCR");
         }
 
         byte[] processedImage = preprocessImage(content);
@@ -88,7 +88,7 @@ public class GeminiVisionOcrEngine implements OcrEngine {
                 return doOcr(base64Image);
             } catch (HttpClientErrorException e) {
                 if (e.getStatusCode().value() != 429) {
-                    throw new IllegalStateException("Gemini OCR API lỗi: " + e.getMessage(), e);
+                    throw new IllegalStateException("Gemini OCR API error: " + e.getMessage(), e);
                 }
                 lastException = e;
                 long delayMs = resolveDelay(e, attempt);
@@ -97,12 +97,12 @@ public class GeminiVisionOcrEngine implements OcrEngine {
                     Thread.sleep(delayMs);
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
-                    throw new IllegalStateException("OCR bị gián đoạn trong backoff", ie);
+                    throw new IllegalStateException("OCR interrupted during backoff", ie);
                 }
             }
         }
         throw new IllegalStateException(
-                "Gemini OCR vẫn trả 429 sau " + MAX_RETRIES + " lần retry", lastException);
+                "Gemini OCR failed with 429 after " + MAX_RETRIES + " retries", lastException);
     }
 
     @SuppressWarnings("unchecked")
@@ -129,7 +129,7 @@ public class GeminiVisionOcrEngine implements OcrEngine {
 
         List<Map<String, Object>> candidates = (List<Map<String, Object>>) response.get("candidates");
         if (candidates == null || candidates.isEmpty()) {
-            throw new IllegalStateException("Gemini OCR không trả về candidate nào: " + response);
+            throw new IllegalStateException("Gemini OCR returned no candidates: " + response);
         }
         Map<String, Object> content = (Map<String, Object>) candidates.get(0).get("content");
         List<Map<String, Object>> parts = (List<Map<String, Object>>) content.get("parts");
@@ -177,7 +177,7 @@ public class GeminiVisionOcrEngine implements OcrEngine {
             return baos.toByteArray();
 
         } catch (IOException e) {
-            log.warn("Không thể tiền xử lý ảnh, gửi bytes gốc: {}", e.getMessage());
+            log.warn("Unable to preprocess image, sending original bytes: {}", e.getMessage());
             return rawBytes;
         }
     }

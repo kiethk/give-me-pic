@@ -187,7 +187,7 @@ export function useUploadQueue(onUploadSuccess?: () => void): UseUploadQueue {
                 // recover it to "failed" so it can be retried or dismissed.
                 for (const item of all) {
                     if (item.status === "uploading") {
-                        await updateStatus(item.clientUploadId, "failed", "Bị gián đoạn khi tải lên.");
+                        await updateStatus(item.clientUploadId, "failed", "Upload interrupted.");
                     }
                 }
             } catch {

@@ -6,6 +6,6 @@ import jakarta.validation.constraints.Size;
 
 public record RegisterRequest(
         @NotBlank @Email String email,
-        @NotBlank @Size(min = 8, message = "Mật khẩu phải có ít nhất 8 ký tự") String password,
+        @NotBlank @Size(min = 8, message = "Password must be at least 8 characters") String password,
         @NotBlank String displayName) {
 }
