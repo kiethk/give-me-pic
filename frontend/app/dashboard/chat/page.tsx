@@ -8,7 +8,7 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import {
-    askChat,
+    askChatStream,
     ChatCitation,
     ChatHistoryMessage,
     ChatSession,
@@ -20,6 +20,10 @@ import {
 } from "@/lib/api-client";
 import { BottomSheet } from "@/components/BottomSheet";
 
+function generateTempId(prefix: string): string {
+    return `${prefix}-${Date.now()}`;
+}
+
 export default function ChatPage() {
     const [subjects, setSubjects] = useState<Subject[]>([]);
     const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -29,9 +33,19 @@ export default function ChatPage() {
     const [question, setQuestion] = useState("");
     const [error, setError] = useState(""); // global error — only for full-page failures
     const [isSending, setIsSending] = useState(false);
+    const [isStreaming, setIsStreaming] = useState(false);
+    const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
     const [previewCitation, setPreviewCitation] = useState<ChatCitation | null>(null);
     const [showHistorySheet, setShowHistorySheet] = useState(false);
+    const [openSourcesMap, setOpenSourcesMap] = useState<Record<string, boolean>>({});
+    const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+
+    // Typewriter streaming queue refs
+    const typewriterQueueRef = useRef<string>("");
+    const typewriterTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const isStreamCompletedRef = useRef<boolean>(false);
+    const activeAssistantIdRef = useRef<string | null>(null);
     
     // Rename state
     const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
@@ -41,11 +55,97 @@ export default function ChatPage() {
     // Stores the last failed send payload so it can be retried inline
     const [failedPayload, setFailedPayload] = useState<{ question: string; sessionId: string | null; subjectId: string | null } | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const chatContainerRef = useRef<HTMLDivElement>(null);
+    const abortControllerRef = useRef<AbortController | null>(null);
+    const shouldAutoScrollRef = useRef(true);
+
+    const handleScroll = () => {
+        const el = chatContainerRef.current;
+        if (!el) return;
+        const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 100;
+        shouldAutoScrollRef.current = isAtBottom;
+    };
+
+    const stopTypewriter = () => {
+        if (typewriterTimerRef.current) {
+            clearInterval(typewriterTimerRef.current);
+            typewriterTimerRef.current = null;
+        }
+        typewriterQueueRef.current = "";
+        isStreamCompletedRef.current = false;
+        activeAssistantIdRef.current = null;
+    };
+
+    const startTypewriter = (assistantId: string) => {
+        stopTypewriter();
+        activeAssistantIdRef.current = assistantId;
+        typewriterQueueRef.current = "";
+        isStreamCompletedRef.current = false;
+
+        typewriterTimerRef.current = setInterval(() => {
+            const queue = typewriterQueueRef.current;
+            if (queue.length > 0) {
+                // Adaptive step size: 1-4 chars per 16ms tick
+                const chunkSize = queue.length > 80 ? 4 : queue.length > 30 ? 2 : 1;
+                const chars = queue.slice(0, chunkSize);
+                typewriterQueueRef.current = queue.slice(chunkSize);
+
+                setMessages((current) =>
+                    current.map((m) =>
+                        m.messageId === activeAssistantIdRef.current
+                            ? { ...m, content: m.content + chars }
+                            : m
+                    )
+                );
+            } else if (isStreamCompletedRef.current) {
+                stopTypewriter();
+                setIsStreaming(false);
+                setStreamingMessageId(null);
+            }
+        }, 16);
+    };
+
+    function handleStopGenerating() {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            abortControllerRef.current = null;
+        }
+        stopTypewriter();
+        setIsStreaming(false);
+        setIsSending(false);
+        setStreamingMessageId(null);
+    }
+
+    const toggleSources = (messageId: string) => {
+        setOpenSourcesMap((prev) => ({
+            ...prev,
+            [messageId]: !prev[messageId],
+        }));
+    };
+
+    const handleCopy = async (text: string, messageId: string) => {
+        try {
+            await navigator.clipboard.writeText(text);
+            setCopiedMessageId(messageId);
+            setTimeout(() => setCopiedMessageId(null), 2000);
+        } catch {
+            // ignore clipboard permissions errors
+        }
+    };
+
+    useEffect(() => {
+        return () => {
+            if (typewriterTimerRef.current) {
+                clearInterval(typewriterTimerRef.current);
+            }
+        };
+    }, []);
+
     async function loadSessions() {
         try {
             setSessions(await getChatSessions());
         } catch (loadError) {
-            setError(loadError instanceof Error ? loadError.message : "Không tải được lịch sử hội thoại.");
+            setError(loadError instanceof Error ? loadError.message : "Could not load chat history.");
         }
     }
 
@@ -54,34 +154,62 @@ export default function ChatPage() {
         try {
             setMessages(await getChatSessionMessages(sessionId));
         } catch (loadError) {
-            setError(loadError instanceof Error ? loadError.message : "Không tải được nội dung hội thoại.");
+            setError(loadError instanceof Error ? loadError.message : "Could not load session messages.");
         } finally {
             setIsLoadingHistory(false);
         }
     }
 
+    function handleSelectSession(sessionId: string) {
+        if (isStreaming) {
+            handleStopGenerating();
+        }
+        setCurrentSessionId(sessionId);
+        loadSessionMessages(sessionId);
+    }
+
     function startNewChat() {
+        if (isStreaming) {
+            handleStopGenerating();
+        }
         setCurrentSessionId(null);
         setMessages([]);
+        setFailedPayload(null);
+        setError("");
+        typewriterQueueRef.current = "";
     }
 
     async function handleSend(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
         const trimmed = question.trim();
-        if (!trimmed || isSending) return;
+        if (!trimmed || isSending || isStreaming) return;
 
         setIsSending(true);
+        setIsStreaming(true);
         setQuestion("");
         setFailedPayload(null);
+        shouldAutoScrollRef.current = true;
 
         const tempUserMessage: ChatHistoryMessage = {
-            messageId: `temp-${Date.now()}`,
+            messageId: generateTempId("user"),
             role: "user",
             content: trimmed,
             createdAt: new Date().toISOString(),
             citations: [],
         };
-        setMessages((current) => [...current, tempUserMessage]);
+
+        const assistantId = generateTempId("assistant");
+        setStreamingMessageId(assistantId);
+
+        const tempAssistantMessage: ChatHistoryMessage = {
+            messageId: assistantId,
+            role: "assistant",
+            content: "",
+            createdAt: new Date().toISOString(),
+            citations: [],
+        };
+
+        setMessages((current) => [...current, tempUserMessage, tempAssistantMessage]);
 
         const payload = {
             question: trimmed,
@@ -89,78 +217,183 @@ export default function ChatPage() {
             subjectId: subjectFilter || null,
         };
 
+        const abortController = new AbortController();
+        abortControllerRef.current = abortController;
+        startTypewriter(assistantId);
+
         try {
-            const response = await askChat(payload);
-
-            if (!currentSessionId) {
-                setCurrentSessionId(response.sessionId);
-                await loadSessions();
+            await askChatStream(
+                payload,
+                {
+                    onMetadata: (data) => {
+                        if (!currentSessionId && data.sessionId) {
+                            setCurrentSessionId(data.sessionId);
+                            loadSessions();
+                        }
+                        setMessages((current) =>
+                            current.map((m) =>
+                                m.messageId === assistantId
+                                    ? { ...m, citations: data.citations }
+                                    : m
+                            )
+                        );
+                    },
+                    onDelta: (deltaText) => {
+                        typewriterQueueRef.current += deltaText;
+                    },
+                    onDone: () => {
+                        isStreamCompletedRef.current = true;
+                        loadSessions();
+                    },
+                    onError: (streamErr) => {
+                        stopTypewriter();
+                        const errorText = streamErr.message || "Could not complete answer.";
+                        setMessages((current) =>
+                            current.map((m) =>
+                                m.messageId === assistantId
+                                    ? { ...m, content: `__error__${errorText}` }
+                                    : m
+                            )
+                        );
+                        setFailedPayload(payload);
+                        setIsStreaming(false);
+                        setStreamingMessageId(null);
+                    },
+                },
+                abortController.signal,
+            );
+        } catch (sendError: unknown) {
+            stopTypewriter();
+            if (abortController.signal.aborted) {
+                setMessages((current) =>
+                    current.map((m) =>
+                        m.messageId === assistantId && !m.content
+                            ? { ...m, content: "(Generation stopped)" }
+                            : m
+                    )
+                );
+            } else {
+                const errorText = sendError instanceof Error ? sendError.message : "Could not send question.";
+                setMessages((current) =>
+                    current.map((m) =>
+                        m.messageId === assistantId
+                            ? { ...m, content: `__error__${errorText}` }
+                            : m
+                    )
+                );
+                setFailedPayload(payload);
             }
-
-            const assistantMessage: ChatHistoryMessage = {
-                messageId: response.messageId,
-                role: "assistant",
-                content: response.answer,
-                createdAt: new Date().toISOString(),
-                citations: response.citations,
-            };
-            setMessages((current) => [...current, assistantMessage]);
-        } catch (sendError) {
-            const errorText = sendError instanceof Error ? sendError.message : "Could not send question.";
-            // Append an inline error bubble instead of a global banner
-            const errorMessage: ChatHistoryMessage = {
-                messageId: `error-${Date.now()}`,
-                role: "assistant",
-                content: `__error__${errorText}`,
-                createdAt: new Date().toISOString(),
-                citations: [],
-            };
-            setMessages((current) => [...current, errorMessage]);
-            setFailedPayload(payload);
+            setIsStreaming(false);
+            setStreamingMessageId(null);
         } finally {
             setIsSending(false);
+            abortControllerRef.current = null;
         }
     }
 
     async function handleRetry() {
-        if (!failedPayload || isSending) return;
-        // Remove the last error bubble before retrying
+        if (!failedPayload || isSending || isStreaming) return;
         setMessages((current) => current.filter((m) => !m.content.startsWith("__error__")));
 
+        const payload = failedPayload;
         setIsSending(true);
+        setIsStreaming(true);
         setFailedPayload(null);
+        shouldAutoScrollRef.current = true;
+
+        const assistantId = generateTempId("assistant");
+        setStreamingMessageId(assistantId);
+
+        const tempAssistantMessage: ChatHistoryMessage = {
+            messageId: assistantId,
+            role: "assistant",
+            content: "",
+            createdAt: new Date().toISOString(),
+            citations: [],
+        };
+        setMessages((current) => [...current, tempAssistantMessage]);
+
+        const abortController = new AbortController();
+        abortControllerRef.current = abortController;
+        startTypewriter(assistantId);
+
         try {
-            const response = await askChat(failedPayload);
-            if (!currentSessionId) {
-                setCurrentSessionId(response.sessionId);
-                await loadSessions();
+            await askChatStream(
+                payload,
+                {
+                    onMetadata: (data) => {
+                        if (!currentSessionId && data.sessionId) {
+                            setCurrentSessionId(data.sessionId);
+                            loadSessions();
+                        }
+                        setMessages((current) =>
+                            current.map((m) =>
+                                m.messageId === assistantId
+                                    ? { ...m, citations: data.citations }
+                                    : m
+                            )
+                        );
+                    },
+                    onDelta: (deltaText) => {
+                        typewriterQueueRef.current += deltaText;
+                    },
+                    onDone: () => {
+                        isStreamCompletedRef.current = true;
+                        loadSessions();
+                    },
+                    onError: (streamErr) => {
+                        stopTypewriter();
+                        const errorText = streamErr.message || "Could not complete answer.";
+                        setMessages((current) =>
+                            current.map((m) =>
+                                m.messageId === assistantId
+                                    ? { ...m, content: `__error__${errorText}` }
+                                    : m
+                            )
+                        );
+                        setFailedPayload(payload);
+                        setIsStreaming(false);
+                        setStreamingMessageId(null);
+                    },
+                },
+                abortController.signal,
+            );
+        } catch (retryError: unknown) {
+            stopTypewriter();
+            if (abortController.signal.aborted) {
+                setMessages((current) =>
+                    current.map((m) =>
+                        m.messageId === assistantId && !m.content
+                            ? { ...m, content: "(Generation stopped)" }
+                            : m
+                    )
+                );
+            } else {
+                const errorText = retryError instanceof Error ? retryError.message : "Could not send question.";
+                setMessages((current) =>
+                    current.map((m) =>
+                        m.messageId === assistantId
+                            ? { ...m, content: `__error__${errorText}` }
+                            : m
+                    )
+                );
+                setFailedPayload(payload);
             }
-            const assistantMessage: ChatHistoryMessage = {
-                messageId: response.messageId,
-                role: "assistant",
-                content: response.answer,
-                createdAt: new Date().toISOString(),
-                citations: response.citations,
-            };
-            setMessages((current) => [...current, assistantMessage]);
-        } catch (retryError) {
-            const errorText = retryError instanceof Error ? retryError.message : "Could not send question.";
-            const errorMessage: ChatHistoryMessage = {
-                messageId: `error-${Date.now()}`,
-                role: "assistant",
-                content: `__error__${errorText}`,
-                createdAt: new Date().toISOString(),
-                citations: [],
-            };
-            setMessages((current) => [...current, errorMessage]);
-            setFailedPayload(failedPayload);
+            setIsStreaming(false);
+            setStreamingMessageId(null);
         } finally {
             setIsSending(false);
+            abortControllerRef.current = null;
         }
     }
 
     useEffect(() => {
-        Promise.all([getChatSessions().then(setSessions), getSubjects().then(setSubjects)]);
+        Promise.all([
+            getChatSessions().then(setSessions),
+            getSubjects().then(setSubjects),
+        ]).catch(() => {
+            // Handled gracefully: layout redirects to login if unauthenticated
+        });
     }, []);
 
     async function handleRenameSubmit(e: React.FormEvent, sessionId: string) {
@@ -179,14 +412,9 @@ export default function ChatPage() {
     }
 
     useEffect(() => {
-        if (currentSessionId) {
-            // eslint-disable-next-line react-hooks/set-state-in-effect
-            loadSessionMessages(currentSessionId);
+        if (shouldAutoScrollRef.current) {
+            messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
         }
-    }, [currentSessionId]);
-
-    useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
 
     if (!subjects && !sessions) {
@@ -252,7 +480,7 @@ export default function ChatPage() {
                                     ) : (
                                         <>
                                             <button
-                                                onClick={() => setCurrentSessionId(session.sessionId)}
+                                                onClick={() => handleSelectSession(session.sessionId)}
                                                 className={`flex flex-1 items-center rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
                                                     currentSessionId === session.sessionId
                                                         ? "bg-[#e7eeff] font-medium text-[#0050cb]"
@@ -286,7 +514,7 @@ export default function ChatPage() {
             </aside>
 
             {/* ── Chat area ── */}
-            <div className="flex flex-1 flex-col overflow-hidden relative">
+            <div className="flex flex-1 flex-col overflow-hidden relative bg-white">
                 {/* Desktop Chat Header */}
                 <div className="hidden md:flex shrink-0 items-center border-b border-[#e2e8f0] bg-white px-6 py-3">
                     <h2 className="text-lg font-bold text-[#111c2d]">
@@ -355,7 +583,6 @@ export default function ChatPage() {
                     </div>
                 </div>
 
-
                 {/* Error banner */}
                 {error && (
                     <div className="mx-4 md:mx-6 mt-4 rounded-xl border border-[#ffdad6] bg-[#fff5f5] px-4 py-3 text-sm text-[#93000a]">
@@ -364,7 +591,7 @@ export default function ChatPage() {
                 )}
 
                 {/* Messages */}
-                <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4 md:py-6">
+                <div ref={chatContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-4 md:px-8 py-6">
                     {isLoadingHistory ? (
                         <div className="flex h-full items-center justify-center">
                             <p className="text-sm text-[#727687]">Loading conversation…</p>
@@ -380,80 +607,134 @@ export default function ChatPage() {
                             <p className="mt-1 text-sm text-[#727687]">Answers will cite the exact photos you uploaded.</p>
                         </div>
                     ) : (
-                        <div className="space-y-4">
+                        <div className="space-y-6 max-w-3xl mx-auto w-full">
                             {messages.map((message) => {
                                 const isError = message.content.startsWith("__error__");
                                 const displayContent = isError
                                     ? message.content.replace("__error__", "")
                                     : message.content;
+                                const isStreamingThis = isStreaming && message.messageId === streamingMessageId;
+                                const isSourcesOpen = !!openSourcesMap[message.messageId];
+
+                                if (message.role === "user") {
+                                    return (
+                                        <div key={message.messageId} className="flex justify-end">
+                                            <div className="max-w-[85%] md:max-w-xl rounded-2xl bg-[#f1f5f9] px-4 py-2.5 text-sm text-[#0f172a] leading-relaxed shadow-xs">
+                                                {displayContent}
+                                            </div>
+                                        </div>
+                                    );
+                                }
 
                                 return (
-                                    <div
-                                        key={message.messageId}
-                                        className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
-                                    >
-                                        <div
-                                            className={`max-w-2xl rounded-2xl px-4 py-3 text-sm ${
-                                                message.role === "user"
-                                                    ? "bg-[#0050cb] text-white"
-                                                    : isError
-                                                      ? "border border-[#ffdad6] bg-[#fff5f5] text-[#93000a]"
-                                                      : "border border-[#e2e8f0] bg-white text-[#111c2d]"
-                                            }`}
-                                        >
-                                            {isError ? (
-                                                <div className="flex items-center gap-3">
-                                                    <span>⚠ {displayContent}</span>
-                                                    {failedPayload && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={handleRetry}
-                                                            disabled={isSending}
-                                                            className="shrink-0 rounded-md bg-[#0050cb] px-2.5 py-1 text-xs font-semibold text-white hover:bg-[#0066ff] disabled:opacity-50 transition-colors"
+                                    <div key={message.messageId} className="flex flex-col w-full group">
+                                        {isError ? (
+                                            <div className="rounded-xl border border-[#ffdad6] bg-[#fff5f5] px-4 py-3 text-sm text-[#93000a] flex items-center justify-between gap-3">
+                                                <span>⚠ {displayContent}</span>
+                                                {failedPayload && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleRetry}
+                                                        disabled={isSending || isStreaming}
+                                                        className="shrink-0 rounded-md bg-[#0050cb] px-2.5 py-1 text-xs font-semibold text-white hover:bg-[#0066ff] disabled:opacity-50 transition-colors"
+                                                    >
+                                                        Retry
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <div className="prose prose-slate max-w-none text-sm text-[#0f172a] leading-relaxed prose-p:my-2 prose-pre:my-2 prose-pre:bg-[#f8fafc] prose-pre:text-[#0f172a] prose-pre:border prose-pre:border-[#e2e8f0]">
+                                                    {displayContent ? (
+                                                        <ReactMarkdown
+                                                            remarkPlugins={[remarkGfm, remarkMath]}
+                                                            rehypePlugins={[rehypeKatex]}
                                                         >
-                                                            {isSending ? "Retrying…" : "Retry"}
-                                                        </button>
+                                                            {displayContent}
+                                                        </ReactMarkdown>
+                                                    ) : null}
+                                                    {isStreamingThis && (
+                                                        <span className="inline-block animate-pulse font-bold text-[#0050cb] select-none ml-0.5">
+                                                            ▍
+                                                        </span>
                                                     )}
                                                 </div>
-                                            ) : (
-                                                <div className="prose prose-sm max-w-none text-current marker:text-current prose-p:leading-relaxed prose-pre:bg-[#f0f3ff] prose-pre:text-[#111c2d] prose-a:text-current prose-strong:text-current prose-headings:text-current prose-code:text-current">
-                                                    <ReactMarkdown
-                                                        remarkPlugins={[remarkGfm, remarkMath]}
-                                                        rehypePlugins={[rehypeKatex]}
-                                                    >
-                                                        {displayContent}
-                                                    </ReactMarkdown>
-                                                </div>
-                                            )}
 
-                                            {!isError && message.role === "assistant" && message.citations.length > 0 && (
-                                                <div className="mt-3 border-t border-[#e2e8f0] pt-3">
-                                                    <p className="text-[11px] font-semibold uppercase tracking-wider text-[#727687]">Sources</p>
-                                                    <div className="mt-2 flex flex-wrap gap-2">
-                                                        {message.citations.map((citation, idx) => (
-                                                            <button
-                                                                key={citation.chunkId}
-                                                                type="button"
-                                                                onClick={() => setPreviewCitation(citation)}
-                                                                className="flex items-center gap-2 rounded-lg border border-[#e2e8f0] bg-[#f9f9ff] px-2 py-1.5 text-left hover:bg-[#e7eeff] transition-colors"
+                                                {/* Citations / Sources collapsible dropdown */}
+                                                {!isError && message.role === "assistant" && message.citations && message.citations.length > 0 && (
+                                                    <div className="mt-3">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => toggleSources(message.messageId)}
+                                                            className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-[#64748b] hover:text-[#0f172a] hover:bg-[#f1f5f9] transition-all"
+                                                        >
+                                                            <span>Source</span>
+                                                            <svg
+                                                                width="12"
+                                                                height="12"
+                                                                viewBox="0 0 24 24"
+                                                                fill="none"
+                                                                stroke="currentColor"
+                                                                strokeWidth="2.5"
+                                                                strokeLinecap="round"
+                                                                strokeLinejoin="round"
+                                                                className={`transition-transform duration-200 ${isSourcesOpen ? "rotate-180" : ""}`}
                                                             >
-                                                                <Image
-                                                                    src={citation.imageUrl}
-                                                                    alt={`Source ${idx + 1}`}
-                                                                    width={24}
-                                                                    height={24}
-                                                                    unoptimized
-                                                                    className="h-6 w-6 rounded object-cover"
-                                                                />
-                                                                <span className="max-w-[110px] truncate text-xs font-medium text-[#424656]">
-                                                                    Source {idx + 1}
-                                                                </span>
-                                                            </button>
-                                                        ))}
+                                                                <polyline points="6 9 12 15 18 9" />
+                                                            </svg>
+                                                        </button>
+
+                                                        {isSourcesOpen && (
+                                                            <div className="mt-2 flex flex-wrap gap-2.5 pt-1">
+                                                                {message.citations.map((citation, idx) => (
+                                                                    <button
+                                                                        key={citation.chunkId}
+                                                                        type="button"
+                                                                        onClick={() => setPreviewCitation(citation)}
+                                                                        className="group relative h-20 w-20 overflow-hidden rounded-xl border border-[#e2e8f0] bg-white shadow-xs transition-all hover:border-[#0050cb] hover:shadow-md hover:scale-105 active:scale-95 cursor-pointer"
+                                                                        title={`View source citation ${idx + 1}`}
+                                                                    >
+                                                                        <Image
+                                                                            src={citation.imageUrl}
+                                                                            alt={`Source ${idx + 1}`}
+                                                                            fill
+                                                                            unoptimized
+                                                                            className="object-cover transition-transform group-hover:scale-110"
+                                                                        />
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        )}
                                                     </div>
-                                                </div>
-                                            )}
-                                        </div>
+                                                )}
+
+                                                {/* Action buttons (copy response) */}
+                                                {!isStreamingThis && displayContent && (
+                                                    <div className="mt-2 flex items-center gap-2 text-[#94a3b8] opacity-80 group-hover:opacity-100 transition-opacity">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleCopy(displayContent, message.messageId)}
+                                                            className="flex items-center gap-1 rounded p-1 hover:bg-[#f1f5f9] hover:text-[#0f172a] transition-colors"
+                                                            title="Copy response"
+                                                        >
+                                                            {copiedMessageId === message.messageId ? (
+                                                                <>
+                                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                        <polyline points="20 6 9 17 4 12" />
+                                                                    </svg>
+                                                                    <span className="text-[11px] font-medium text-[#16a34a]">Copied</span>
+                                                                </>
+                                                            ) : (
+                                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                                                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                                                                </svg>
+                                                            )}
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
                                     </div>
                                 );
                             })}
@@ -469,15 +750,28 @@ export default function ChatPage() {
                             value={question}
                             onChange={(e) => setQuestion(e.target.value)}
                             placeholder="Ask anything about your notes…"
-                            disabled={isSending}
+                            disabled={isSending || isStreaming}
                             className="flex-1 bg-transparent text-sm text-[#111c2d] placeholder:text-[#727687] outline-none disabled:opacity-60"
                         />
+                        {isStreaming && (
+                            <button
+                                type="button"
+                                onClick={handleStopGenerating}
+                                className="flex items-center gap-1.5 rounded-lg border border-[#ba1a1a] bg-white px-2.5 py-1 text-xs font-semibold text-[#ba1a1a] hover:bg-[#fff5f5] active:scale-95 transition-all shadow-sm"
+                                title="Stop generating"
+                            >
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                                    <rect x="4" y="4" width="16" height="16" rx="2" />
+                                </svg>
+                                <span>Stop</span>
+                            </button>
+                        )}
                         <button
                             type="submit"
-                            disabled={isSending || !question.trim()}
+                            disabled={isSending || isStreaming || !question.trim()}
                             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#0050cb] text-white hover:bg-[#0066ff] disabled:opacity-50 transition-colors"
                         >
-                            {isSending ? (
+                            {isSending && !isStreaming ? (
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="animate-spin" strokeLinecap="round" strokeLinejoin="round">
                                     <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
                                 </svg>
@@ -548,7 +842,7 @@ export default function ChatPage() {
                                         <>
                                             <button
                                                 onClick={() => {
-                                                    setCurrentSessionId(session.sessionId);
+                                                    handleSelectSession(session.sessionId);
                                                     setShowHistorySheet(false);
                                                 }}
                                                 className={`flex flex-1 items-center rounded-xl px-4 py-3.5 text-left text-[15px] transition-colors ${

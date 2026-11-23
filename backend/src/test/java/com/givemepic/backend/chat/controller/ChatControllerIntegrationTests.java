@@ -14,6 +14,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.mockito.ArgumentMatchers.anyString;
@@ -82,7 +83,7 @@ class ChatControllerIntegrationTests {
                 chunkId, mediaId, ocrResultId, 0, "Newton's first law states that an object remains in a state of rest...");
 
         // Insert chunk embedding
-        String vectorLiteral = queryVector.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(",", "[", "]"));
+        String vectorLiteral = queryVector.stream().map(String::valueOf).collect(Collectors.joining(",", "[", "]"));
         jdbcTemplate.update("INSERT INTO chunk_embeddings (id, chunk_id, embedding, model_name) VALUES (gen_random_uuid(), ?, ?::vector, ?)",
                 chunkId, vectorLiteral, "gemini-embedding-001");
 

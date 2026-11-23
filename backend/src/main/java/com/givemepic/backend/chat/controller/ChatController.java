@@ -4,9 +4,12 @@ import com.givemepic.backend.chat.dto.ChatHistoryMessageResponse;
 import com.givemepic.backend.chat.dto.ChatMessageResponse;
 import com.givemepic.backend.chat.dto.ChatRequest;
 import com.givemepic.backend.chat.dto.ChatSessionSummary;
+import com.givemepic.backend.chat.dto.RenameSessionRequest;
 import com.givemepic.backend.chat.dto.SimilaritySearchResponse;
 import com.givemepic.backend.chat.service.ChatService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 import java.util.UUID;
@@ -46,6 +50,17 @@ public class ChatController {
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public ResponseEntity<SseEmitter> streamChat(
+            @AuthenticationPrincipal UUID userId,
+            @RequestBody ChatRequest request) {
+        SseEmitter emitter = chatService.answerStream(userId, request);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CACHE_CONTROL, "no-cache, no-transform")
+                .header("X-Accel-Buffering", "no")
+                .body(emitter);
+    }
+
     @GetMapping("/sessions")
     public ResponseEntity<List<ChatSessionSummary>> listSessions(
             @AuthenticationPrincipal UUID userId) {
@@ -63,7 +78,7 @@ public class ChatController {
     public ResponseEntity<Void> renameSession(
             @AuthenticationPrincipal UUID userId,
             @PathVariable UUID sessionId,
-            @RequestBody com.givemepic.backend.chat.dto.RenameSessionRequest request) {
+            @RequestBody RenameSessionRequest request) {
         chatService.renameSession(userId, sessionId, request.title());
         return ResponseEntity.noContent().build();
     }
