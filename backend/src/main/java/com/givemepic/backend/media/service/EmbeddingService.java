@@ -14,6 +14,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -77,7 +78,7 @@ public class EmbeddingService {
         if (successCount == chunks.size()) {
             setMediaEmbeddingStatus(mediaId, "completed", null);
         } else {
-            setMediaEmbeddingStatus(mediaId, "failed", "Một số đoạn văn bản không thể xử lý");
+            setMediaEmbeddingStatus(mediaId, "failed", "Some text chunks could not be processed");
         }
         
         return successCount;
@@ -102,6 +103,6 @@ public class EmbeddingService {
     private String toVectorLiteral(List<Float> vector) {
         return vector.stream()
                 .map(String::valueOf)
-                .collect(java.util.stream.Collectors.joining(",", "[", "]"));
+                .collect(Collectors.joining(",", "[", "]"));
     }
 }

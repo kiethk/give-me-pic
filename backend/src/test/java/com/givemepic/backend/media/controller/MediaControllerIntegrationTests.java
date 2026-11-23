@@ -46,7 +46,7 @@ class MediaControllerIntegrationTests {
         mockMvc.perform(multipart("/api/media/upload")
                 .file(file)
                 .param("subjectId", subjectId)
-                .param("caption", "Bài tập toán")
+                .param("caption", "Math homework")
                 .cookie(accessCookie))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.subjectId").value(subjectId))

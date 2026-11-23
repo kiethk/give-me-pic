@@ -10,6 +10,7 @@ import com.givemepic.backend.subject.entity.Subject;
 import com.givemepic.backend.subject.repository.SubjectRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -40,7 +41,7 @@ public class MediaService {
     private String baseUrl;
 
     /** Returns the backend proxy URL for an image. Accessible from any LAN client via port 8080. */
-    private String imageProxyUrl(java.util.UUID mediaId) {
+    private String imageProxyUrl(UUID mediaId) {
         return "/api/media/" + mediaId + "/image";
     }
 
@@ -79,15 +80,15 @@ public class MediaService {
 
         validateSubjectOwnership(userId, subjectId);
         if (file == null || file.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "File không được để trống");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "File must not be empty");
         }
         String originalName = Objects.requireNonNullElse(file.getOriginalFilename(), "upload");
         String resolvedContentType = resolveImageContentType(file.getContentType(), originalName);
         if (resolvedContentType == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Chỉ hỗ trợ file hình ảnh");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only image files are supported");
         }
         if (file.getSize() > maxFileSizeBytes) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ảnh vượt quá dung lượng cho phép");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Image exceeds maximum allowed size");
         }
         String objectKey = generateObjectKey(userId, subjectId, originalName);
         String storedName = objectKey.substring(objectKey.lastIndexOf('/') + 1);
@@ -108,7 +109,7 @@ public class MediaService {
             Media savedMedia = mediaRepository.save(media);
             eventPublisher.publishEvent(new MediaUploadedEvent(savedMedia.getId()));
             return MediaResponse.from(savedMedia, imageProxyUrl(savedMedia.getId()));
-        } catch (org.springframework.dao.DataIntegrityViolationException ex) {
+        } catch (DataIntegrityViolationException ex) {
             if (clientUploadId != null) {
                 Optional<Media> existing = mediaRepository.findByUserIdAndClientUploadId(userId, clientUploadId);
                 if (existing.isPresent()) {
@@ -118,7 +119,7 @@ public class MediaService {
             }
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Client upload ID conflict", ex);
         } catch (RuntimeException ex) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Không thể lưu file vào storage", ex);
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Unable to save file to storage", ex);
         }
     }
 
@@ -142,11 +143,11 @@ public class MediaService {
 
         validateSubjectOwnership(userId, subjectId);
         if (sizeBytes > maxFileSizeBytes) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ảnh vượt quá dung lượng cho phép");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Image exceeds maximum allowed size");
         }
         String resolvedContentType = resolveImageContentType(contentType, fileName);
         if (resolvedContentType == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Chỉ hỗ trợ file hình ảnh");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only image files are supported");
         }
         try {
             Media media = Media.builder()
@@ -164,7 +165,7 @@ public class MediaService {
             Media savedMedia = mediaRepository.save(media);
             eventPublisher.publishEvent(new MediaUploadedEvent(savedMedia.getId()));
             return MediaResponse.from(savedMedia, imageProxyUrl(savedMedia.getId()));
-        } catch (org.springframework.dao.DataIntegrityViolationException ex) {
+        } catch (DataIntegrityViolationException ex) {
             if (clientUploadId != null) {
                 Optional<Media> existing = mediaRepository.findByUserIdAndClientUploadId(userId, clientUploadId);
                 if (existing.isPresent()) {
@@ -174,17 +175,17 @@ public class MediaService {
             }
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Client upload ID conflict", ex);
         } catch (RuntimeException ex) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Không thể lưu file vào storage", ex);
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Unable to save file to storage", ex);
         }
     }
 
     @Transactional
     public void delete(UUID userId, UUID mediaId) {
         Media media = mediaRepository.findById(mediaId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy file"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "File not found"));
 
         if (!media.getUserId().equals(userId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không có quyền xóa file này");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have permission to delete this file");
         }
 
         objectStorageService.delete(media.getStoragePath());
@@ -194,9 +195,9 @@ public class MediaService {
     @Transactional
     public void retryProcessing(UUID userId, UUID mediaId) {
         Media media = mediaRepository.findById(mediaId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy file"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "File not found"));
         if (!media.getUserId().equals(userId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không có quyền xử lý file này");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have permission to process this file");
         }
 
         media.setOcrStatus("pending");
@@ -209,7 +210,7 @@ public class MediaService {
 
     private Subject validateSubjectOwnership(UUID userId, UUID subjectId) {
         return subjectRepository.findByIdAndUserId(subjectId, userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy môn học"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Subject not found"));
     }
 
     private String resolveImageContentType(String contentType, String fileName) {

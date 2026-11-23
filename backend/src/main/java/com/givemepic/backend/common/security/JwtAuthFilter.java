@@ -2,6 +2,7 @@ package com.givemepic.backend.common.security;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.lang.NonNull;
@@ -39,7 +40,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         } else if (request.getCookies() != null) {
             token = Arrays.stream(request.getCookies())
                     .filter(cookie -> "access_token".equals(cookie.getName()))
-                    .map(jakarta.servlet.http.Cookie::getValue)
+                    .map(Cookie::getValue)
                     .findFirst()
                     .orElse(null);
         }
@@ -54,5 +55,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    @Override
+    protected boolean shouldNotFilterAsyncDispatch() {
+        return false;
     }
 }
