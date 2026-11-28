@@ -7,6 +7,7 @@ import com.givemepic.backend.auth.dto.LoginRequest;
 import com.givemepic.backend.auth.dto.RegisterRequest;
 import com.givemepic.backend.auth.dto.UpdateProfileRequest;
 import com.givemepic.backend.auth.dto.UserProfileResponse;
+import com.givemepic.backend.auth.dto.UserQuotaSnapshot;
 import com.givemepic.backend.auth.entity.RefreshToken;
 import com.givemepic.backend.auth.entity.User;
 import com.givemepic.backend.auth.repository.RefreshTokenRepository;
@@ -159,6 +160,73 @@ public class AuthService {
         userRepository.save(user);
 
         return new UserProfileResponse(user.getId(), user.getEmail(), user.getDisplayName(), user.getAvatarUrl(), user.getSubscriptionTier());
+    }
+
+    /**
+     * Returns the current subscription tier and storage quota snapshot for a user.
+     */
+    @Transactional(readOnly = true)
+    public UserQuotaSnapshot getQuotaSnapshot(UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+        return new UserQuotaSnapshot(
+                user.getId(),
+                user.getSubscriptionTier(),
+                user.getStorageQuotaBytes(),
+                user.getStorageUsedBytes()
+        );
+    }
+
+    /**
+     * Atomically increments {@code storage_used_bytes} if {@code used + deltaBytes <= quota}.
+     */
+    @Transactional
+    public boolean incrementStorageUsedIfWithinQuota(UUID userId, long deltaBytes) {
+        if (deltaBytes < 0) {
+            throw new IllegalArgumentException("deltaBytes must be non-negative");
+        }
+        return userRepository.incrementStorageUsedIfWithinQuota(userId, deltaBytes, Instant.now()) > 0;
+    }
+
+    /**
+     * Atomically decrements {@code storage_used_bytes}, clamping at 0.
+     */
+    @Transactional
+    public void decrementStorageUsed(UUID userId, long deltaBytes) {
+        if (deltaBytes < 0) {
+            throw new IllegalArgumentException("deltaBytes must be non-negative");
+        }
+        if (deltaBytes == 0) {
+            return;
+        }
+        userRepository.decrementStorageUsed(userId, deltaBytes, Instant.now());
+    }
+
+    /**
+     * Activates the Pro subscription tier and updates the user's storage quota.
+     */
+    @Transactional
+    public void activateProTier(UUID userId, long proStorageQuotaBytes) {
+        updateSubscriptionTier(userId, "pro", proStorageQuotaBytes);
+    }
+
+    /**
+     * Downgrades the user back to the Free tier and updates the storage quota.
+     */
+    @Transactional
+    public void downgradeToFreeTier(UUID userId, long freeStorageQuotaBytes) {
+        updateSubscriptionTier(userId, "free", freeStorageQuotaBytes);
+    }
+
+    private void updateSubscriptionTier(UUID userId, String tier, long storageQuotaBytes) {
+        if (storageQuotaBytes < 0) {
+            throw new IllegalArgumentException("storageQuotaBytes must be non-negative");
+        }
+        int updated = userRepository.updateSubscriptionTier(userId, tier, storageQuotaBytes, Instant.now());
+        if (updated == 0) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
+        }
     }
 
     private AuthResponse buildAuthResponse(User user) {

@@ -1,5 +1,6 @@
 package com.givemepic.backend.media.service;
 
+import com.givemepic.backend.billing.service.QuotaService;
 import com.givemepic.backend.media.dto.MediaResponse;
 import com.givemepic.backend.media.entity.Media;
 import com.givemepic.backend.media.event.MediaUploadedEvent;
@@ -33,6 +34,7 @@ public class MediaService {
     private final ObjectStorageService objectStorageService;
     private final ApplicationEventPublisher eventPublisher;
     private final OcrProcessingService ocrProcessingService;
+    private final QuotaService quotaService;
 
     @Value("${app.media.max-file-size-bytes:10485760}")
     private long maxFileSizeBytes;
@@ -90,8 +92,9 @@ public class MediaService {
         if (file.getSize() > maxFileSizeBytes) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Image exceeds maximum allowed size");
         }
-        String objectKey = generateObjectKey(userId, subjectId, originalName);
+        String objectKey = buildObjectKey(userId, subjectId, originalName);
         String storedName = objectKey.substring(objectKey.lastIndexOf('/') + 1);
+        quotaService.consumeUploadQuota(userId, file.getSize());
         try {
             objectStorageService.store(objectKey, file);
             Media media = Media.builder()
@@ -124,7 +127,16 @@ public class MediaService {
     }
 
     public String generateObjectKey(UUID userId, UUID subjectId, String originalName) {
+        return generateObjectKey(userId, subjectId, originalName, 0L);
+    }
+
+    public String generateObjectKey(UUID userId, UUID subjectId, String originalName, long sizeBytes) {
         validateSubjectOwnership(userId, subjectId);
+        quotaService.assertUploadAllowed(userId, sizeBytes);
+        return buildObjectKey(userId, subjectId, originalName);
+    }
+
+    private String buildObjectKey(UUID userId, UUID subjectId, String originalName) {
         String sanitizedName = originalName.replace("\\", "/");
         String storedName = UUID.randomUUID() + "_" + sanitizedName.substring(sanitizedName.lastIndexOf('/') + 1);
         return userId + "/" + subjectId + "/" + storedName;
@@ -142,6 +154,9 @@ public class MediaService {
         }
 
         validateSubjectOwnership(userId, subjectId);
+        if (sizeBytes < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "File size must not be negative");
+        }
         if (sizeBytes > maxFileSizeBytes) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Image exceeds maximum allowed size");
         }
@@ -149,6 +164,7 @@ public class MediaService {
         if (resolvedContentType == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only image files are supported");
         }
+        quotaService.consumeUploadQuota(userId, sizeBytes);
         try {
             Media media = Media.builder()
                     .userId(userId)
@@ -190,6 +206,7 @@ public class MediaService {
 
         objectStorageService.delete(media.getStoragePath());
         mediaRepository.delete(media);
+        quotaService.releaseStorage(userId, media.getSizeBytes());
     }
 
     @Transactional

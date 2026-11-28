@@ -28,6 +28,13 @@ app:
   chat:
     gemini-api-key: ${GEMINI_API_KEY:}
     model: ${GEMINI_CHAT_MODEL:gemini-3.1-flash-lite}
+  payos:
+    base-url: ${PAYOS_BASE_URL:https://api-merchant.payos.vn}
+    client-id: ${PAYOS_CLIENT_ID:616b0ba8-32d1-4761-86e1-4bae7043cc03}
+    api-key: ${PAYOS_API_KEY:959af9b8-9fea-4bd1-984a-bd987222f5ed}
+    checksum-key: ${PAYOS_CHECKSUM_KEY:7dd69aa277c153c78b9b2b0bd77a54077be279c8ff9f72ea9a74673bdd059233}
+    return-url: ${PAYOS_RETURN_URL:http://localhost:3000/dashboard/profile?payment=success}
+    cancel-url: ${PAYOS_CANCEL_URL:http://localhost:3000/dashboard/profile?payment=cancelled}
 spring:
   servlet:
     multipart:

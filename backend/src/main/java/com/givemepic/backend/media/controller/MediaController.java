@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
@@ -57,11 +58,16 @@ public class MediaController {
             @AuthenticationPrincipal UUID userId,
             @RequestParam UUID subjectId,
             @RequestParam String fileName,
-            @RequestParam String contentType) {
-        
-        String objectKey = mediaService.generateObjectKey(userId, subjectId, fileName);
+            @RequestParam String contentType,
+            @RequestParam(required = false) Long sizeBytes) {
+
+        if (sizeBytes != null && sizeBytes < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "File size must not be negative");
+        }
+        long resolvedSizeBytes = sizeBytes != null ? sizeBytes : 0L;
+        String objectKey = mediaService.generateObjectKey(userId, subjectId, fileName, resolvedSizeBytes);
         String url = objectStorageService.createPresignedPutUrl(objectKey, contentType);
-        
+
         return ResponseEntity.ok(Map.of(
                 "url", url,
                 "objectKey", objectKey

@@ -1,9 +1,11 @@
 package com.givemepic.backend.chat.controller;
 
+import com.givemepic.backend.billing.service.BillingPlan;
 import com.givemepic.backend.chat.service.ChatService;
 import com.givemepic.backend.media.service.EmbeddingProvider;
 import com.givemepic.backend.media.service.LlmProvider;
 import jakarta.servlet.http.Cookie;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -15,17 +17,23 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.time.YearMonth;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ForkJoinPool;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -52,6 +60,11 @@ class ChatStreamingControllerTests {
 
     @MockitoBean
     private LlmProvider llmProvider;
+
+    @AfterEach
+    void restoreExecutor() {
+        chatService.setStreamExecutor(ForkJoinPool.commonPool());
+    }
 
     @Test
     void streamEndpointEmitsEventsAndPersistsData() throws Exception {
@@ -179,5 +192,108 @@ class ChatStreamingControllerTests {
                 .andExpect(jsonPath("$.sessionId").isNotEmpty())
                 .andExpect(jsonPath("$.messageId").isNotEmpty())
                 .andExpect(jsonPath("$.answer").value("Non-streaming answer"));
+    }
+
+    @Test
+    void streamEndpointReturns402SynchronouslyOn31stQuestionWithoutCallingLlmProvider() throws Exception {
+        chatService.setStreamExecutor(Runnable::run);
+
+        List<Float> queryVector = Stream.generate(() -> 0.1f)
+                .limit(768)
+                .toList();
+        when(embeddingProvider.embed(anyString())).thenReturn(queryVector);
+        doAnswer(invocation -> {
+            Consumer<String> onChunk = invocation.getArgument(1);
+            Runnable onComplete = invocation.getArgument(2);
+            onChunk.accept("Answer 30");
+            onComplete.run();
+            return null;
+        }).when(llmProvider).streamAnswer(anyString(), any(), any(), any());
+        when(llmProvider.generateAnswer(anyString())).thenReturn("Title 30");
+
+        String email = "stream-quota-" + UUID.randomUUID() + "@example.com";
+        MockHttpServletResponse authResponse = mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + email + "\",\"password\":\"password123\",\"displayName\":\"Stream Quota User\"}"))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse();
+
+        Cookie accessCookie = authResponse.getCookie("access_token");
+        UUID userId = jdbcTemplate.queryForObject("SELECT id FROM users WHERE email = ?", UUID.class, email);
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO usage_monthly (id, user_id, year_month, photos_uploaded_count, questions_asked_count, updated_at)
+                VALUES (?, ?, ?, 0, ?, NOW())
+                """,
+                UUID.randomUUID(),
+                userId,
+                YearMonth.now(ZoneOffset.UTC).toString(),
+                BillingPlan.FREE_MONTHLY_QUESTIONS - 1
+        );
+
+        String requestJson = "{\"question\":\"Question number 30?\"}";
+        MvcResult okResult = mockMvc.perform(post("/api/chat/stream")
+                        .cookie(accessCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+
+        mockMvc.perform(asyncDispatch(okResult))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM));
+
+        clearInvocations(llmProvider, embeddingProvider);
+
+        MvcResult quotaResult = mockMvc.perform(post("/api/chat/stream")
+                        .cookie(accessCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"question\":\"Question number 31?\"}"))
+                .andExpect(status().isPaymentRequired())
+                .andExpect(jsonPath("$.code").value("QUOTA_EXCEEDED"))
+                .andExpect(jsonPath("$.quotaType").value("questions"))
+                .andReturn();
+
+        assertFalse(quotaResult.getRequest().isAsyncStarted(), "402 response must be returned synchronously without starting SSE");
+        verifyNoInteractions(llmProvider, embeddingProvider);
+    }
+
+    @Test
+    void postChatReturns402WhenMonthlyQuestionQuotaExceeded() throws Exception {
+        String email = "chat-quota-" + UUID.randomUUID() + "@example.com";
+        MockHttpServletResponse authResponse = mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + email + "\",\"password\":\"password123\",\"displayName\":\"Chat Quota User\"}"))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse();
+
+        Cookie accessCookie = authResponse.getCookie("access_token");
+        UUID userId = jdbcTemplate.queryForObject("SELECT id FROM users WHERE email = ?", UUID.class, email);
+
+        jdbcTemplate.update(
+                """
+                INSERT INTO usage_monthly (id, user_id, year_month, photos_uploaded_count, questions_asked_count, updated_at)
+                VALUES (?, ?, ?, 0, ?, NOW())
+                """,
+                UUID.randomUUID(),
+                userId,
+                YearMonth.now(ZoneOffset.UTC).toString(),
+                BillingPlan.FREE_MONTHLY_QUESTIONS
+        );
+
+        clearInvocations(llmProvider, embeddingProvider);
+
+        mockMvc.perform(post("/api/chat")
+                        .cookie(accessCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"question\":\"Question over quota?\"}"))
+                .andExpect(status().isPaymentRequired())
+                .andExpect(jsonPath("$.code").value("QUOTA_EXCEEDED"))
+                .andExpect(jsonPath("$.quotaType").value("questions"));
+
+        verifyNoInteractions(llmProvider, embeddingProvider);
     }
 }

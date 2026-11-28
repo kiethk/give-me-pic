@@ -1,5 +1,6 @@
 package com.givemepic.backend.chat.service;
 
+import com.givemepic.backend.billing.service.QuotaService;
 import com.givemepic.backend.chat.dto.ChatHistoryMessageResponse;
 import com.givemepic.backend.chat.dto.ChatMessageResponse;
 import com.givemepic.backend.chat.dto.ChatRequest;
@@ -40,6 +41,7 @@ public class ChatService {
     private final JdbcTemplate jdbcTemplate;
     private final LlmProvider llmProvider;
     private final ObjectStorageService storageService;
+    private final QuotaService quotaService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private Executor streamExecutor = ForkJoinPool.commonPool();
@@ -97,6 +99,7 @@ public class ChatService {
 
     @Transactional
     public ChatMessageResponse answer(UUID userId, ChatRequest request) {
+        quotaService.consumeQuestionQuota(userId);
         UUID sessionId = request.sessionId();
         boolean isNewSession = false;
         if (sessionId == null) {
@@ -171,6 +174,7 @@ public class ChatService {
     }
 
     public SseEmitter answerStream(UUID userId, ChatRequest request) {
+        quotaService.consumeQuestionQuota(userId);
         SseEmitter emitter = new SseEmitter(180_000L);
         streamExecutor.execute(() -> processAnswerStream(userId, request, emitter));
         return emitter;
