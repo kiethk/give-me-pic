@@ -30,6 +30,7 @@ Last updated: 2026-08-19
 - [x] PWA Upload Queue: Add dismiss/clear-all buttons and auto-recovery for interrupted uploads
 - [x] UI Topbar Redesign: Typography-only tabs with bottom border indicator and profile dropdown
 - [x] Chat streaming via SSE (POST /api/chat/stream, typewriter client queue, stop generating)
+- [x] Phase 5: Billing/subscription tracking (`subscriptions`, `usage_monthly`, PayOS VietQR, quota enforcement)
 
 ## In Progress
 
@@ -42,7 +43,6 @@ Last updated: 2026-08-19
 
 ## Not Started
 
-- [ ] Phase 5: Billing/subscription tracking (`subscriptions`, `usage_monthly`)
 - [ ] Phase 6: Production Hardening
 - [ ] Phase 7: Native Mobile App
 
@@ -207,19 +207,24 @@ CREATE INDEX idx_message_citations_message_id ON message_citations(message_id);
 ```
 ```
 
-### Module: Billing (schema ready from day one, feature built later)
+### Module: Billing (PayOS VietQR & monthly usage quotas)
 
 ```sql
 CREATE TABLE subscriptions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    order_code BIGINT NOT NULL UNIQUE,
     plan VARCHAR(20) NOT NULL,
+    amount_vnd INTEGER NOT NULL,
     status VARCHAR(20) NOT NULL,
-    payment_provider VARCHAR(30),
+    payment_provider VARCHAR(30) NOT NULL DEFAULT 'payos',
     payment_reference VARCHAR(255),
-    started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    checkout_url VARCHAR(500),
+    qr_code TEXT,
+    started_at TIMESTAMPTZ,
     expires_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE TABLE usage_monthly (
