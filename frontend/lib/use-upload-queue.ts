@@ -56,6 +56,10 @@ interface UseUploadQueue {
     isProcessing: boolean;
     /** Non-null when a 429 rate limit is active — shows how many seconds remain. */
     rateLimitMessage: string | null;
+    /** Non-null when a 402 quota limit was hit during queued upload. */
+    quotaExceededMessage: string | null;
+    /** Clear the active quota exceeded banner message. */
+    clearQuotaError: () => void;
     /**
      * Enqueue a file for upload. If online, starts uploading immediately.
      * If offline, stores in IndexedDB and uploads when the connection returns.
@@ -74,6 +78,7 @@ export function useUploadQueue(onUploadSuccess?: () => void): UseUploadQueue {
     const [isOnline, setIsOnline] = useState<boolean>(true);
     const [isProcessing, setIsProcessing] = useState(false);
     const [rateLimitMessage, setRateLimitMessage] = useState<string | null>(null);
+    const [quotaExceededMessage, setQuotaExceededMessage] = useState<string | null>(null);
     const processingRef = useRef(false); // guard against concurrent runs
     const rateLimitUntilRef = useRef<number>(0); // epoch ms when rate limit expires
 
@@ -100,6 +105,7 @@ export function useUploadQueue(onUploadSuccess?: () => void): UseUploadQueue {
         if (processingRef.current) return;
         processingRef.current = true;
         setIsProcessing(true);
+        setQuotaExceededMessage(null);
 
         try {
             const pending = await getUploads(["pending", "failed"]);
@@ -154,11 +160,26 @@ export function useUploadQueue(onUploadSuccess?: () => void): UseUploadQueue {
 
                     if (!response.ok) {
                         const data = await response.json().catch(() => null);
+                        if (response.status === 402 || data?.code === "QUOTA_EXCEEDED") {
+                            const errorMessage =
+                                data?.message || "Quota limit reached. Upgrade to Pro to continue.";
+                            await updateStatus(item.clientUploadId, "failed", errorMessage);
+                            setQuotaExceededMessage(errorMessage);
+                            window.dispatchEvent(
+                                new CustomEvent("open-upgrade-modal", {
+                                    detail: { message: errorMessage, quotaType: data?.quotaType },
+                                }),
+                            );
+                            await refreshQueue();
+                            break; // stop loop so remaining queued items do not keep hitting 402
+                        }
+
                         const errorMessage = data?.message || data?.error || `Upload failed (${response.status})`;
                         throw new Error(errorMessage);
                     }
 
                     await removeFromQueue(item.clientUploadId);
+                    setQuotaExceededMessage(null);
                     onUploadSuccess?.();
                 } catch (err) {
                     const msg = err instanceof Error ? err.message : "Upload failed.";
@@ -221,6 +242,18 @@ export function useUploadQueue(onUploadSuccess?: () => void): UseUploadQueue {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    useEffect(() => {
+        function handleBillingUpdated() {
+            setQuotaExceededMessage(null);
+            if (navigator.onLine) {
+                processQueue();
+            }
+        }
+
+        window.addEventListener("billing-updated", handleBillingUpdated);
+        return () => window.removeEventListener("billing-updated", handleBillingUpdated);
+    }, [processQueue]);
+
     // -----------------------------------------------------------------------
     // Public actions
     // -----------------------------------------------------------------------
@@ -269,5 +302,20 @@ export function useUploadQueue(onUploadSuccess?: () => void): UseUploadQueue {
         await refreshQueue();
     }, [refreshQueue]);
 
-    return { queue, isOnline, isProcessing, rateLimitMessage, addToQueue, retryFailed, removeItem, clearFailed };
+    const clearQuotaError = useCallback(() => {
+        setQuotaExceededMessage(null);
+    }, []);
+
+    return {
+        queue,
+        isOnline,
+        isProcessing,
+        rateLimitMessage,
+        quotaExceededMessage,
+        clearQuotaError,
+        addToQueue,
+        retryFailed,
+        removeItem,
+        clearFailed,
+    };
 }

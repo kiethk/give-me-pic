@@ -4,8 +4,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { getProfile, logout, UserProfile } from "@/lib/api-client";
+import { BillingSummary, getBillingSummary, getProfile, logout, UserProfile } from "@/lib/api-client";
 import { BottomSheet } from "@/components/BottomSheet";
+import { UpgradeProModal } from "@/components/UpgradeProModal";
 import { setPendingUploadFiles } from "@/lib/pending-upload-store";
 
 // ── Icons (inline SVG, no extra dependency) ──────────────────────────────────
@@ -63,6 +64,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const pathname = usePathname();
     const router = useRouter();
     const [profile, setProfile] = useState<UserProfile | null>(null);
+    const [billingSummary, setBillingSummary] = useState<BillingSummary | null>(null);
+    const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+    const [upgradeNotice, setUpgradeNotice] = useState<string | null>(null);
     const [showProfileSheet, setShowProfileSheet] = useState(false);
     const [showCaptureSheet, setShowCaptureSheet] = useState(false);
     const [showUserMenu, setShowUserMenu] = useState(false);
@@ -75,7 +79,37 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         getProfile()
             .then(setProfile)
             .catch(() => router.push("/"));
+        getBillingSummary()
+            .then(setBillingSummary)
+            .catch(() => {});
+
+        function handleBillingUpdated() {
+            getProfile().then(setProfile).catch(() => {});
+            getBillingSummary().then(setBillingSummary).catch(() => {});
+        }
+
+        window.addEventListener("billing-updated", handleBillingUpdated);
+        return () => window.removeEventListener("billing-updated", handleBillingUpdated);
     }, [router]);
+
+    useEffect(() => {
+        function handleOpenUpgradeModal(event: Event) {
+            const customEvent = event as CustomEvent<{ message?: string; quotaType?: string }>;
+            setUpgradeNotice(customEvent.detail?.message ?? null);
+            setShowUpgradeModal(true);
+        }
+        window.addEventListener("open-upgrade-modal", handleOpenUpgradeModal);
+        return () => window.removeEventListener("open-upgrade-modal", handleOpenUpgradeModal);
+    }, []);
+
+    function openUpgradeModal(notice: string | null = null) {
+        setUpgradeNotice(notice);
+        setShowUpgradeModal(true);
+    }
+
+    function handleUpgraded() {
+        window.dispatchEvent(new Event("billing-updated"));
+    }
 
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
@@ -179,12 +213,30 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
                 {/* Right: Upgrade Pro pill & User profile dropdown */}
                 <div className="flex items-center gap-3">
-                    <button className="flex items-center gap-1.5 rounded-lg border border-[#c7d7fe] bg-[#f0f4ff] px-3 py-1.5 text-xs font-semibold text-[#0050cb] shadow-xs transition hover:bg-[#e0eaff] hover:border-[#b2c8fd] active:scale-[0.98]">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7-6.3-4.6-6.3 4.6 2.3-7-6-4.6h7.6z"/>
-                        </svg>
-                        Upgrade Pro
-                    </button>
+                    {billingSummary !== null &&
+                        (billingSummary.tier === "pro" ? (
+                            <button
+                                type="button"
+                                onClick={() => openUpgradeModal()}
+                                className="flex items-center gap-1.5 rounded-full bg-[#0050cb] px-3 py-1 text-xs font-bold tracking-wide text-white shadow-xs transition hover:bg-[#0042a8] active:scale-[0.98]"
+                            >
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7-6.3-4.6-6.3 4.6 2.3-7-6-4.6h7.6z" />
+                                </svg>
+                                PRO
+                            </button>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={() => openUpgradeModal()}
+                                className="flex items-center gap-1.5 rounded-lg border border-[#c7d7fe] bg-[#f0f4ff] px-3 py-1.5 text-xs font-semibold text-[#0050cb] shadow-xs transition hover:bg-[#e0eaff] hover:border-[#b2c8fd] active:scale-[0.98]"
+                            >
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7-6.3-4.6-6.3 4.6 2.3-7-6-4.6h7.6z" />
+                                </svg>
+                                Upgrade Pro
+                            </button>
+                        ))}
 
                     {/* User profile dropdown container */}
                     <div className="relative" ref={userMenuRef}>
@@ -308,6 +360,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                 Profile
                             </button>
                             <button
+                                type="button"
+                                onClick={() => {
+                                    setShowProfileSheet(false);
+                                    openUpgradeModal();
+                                }}
+                                className="flex w-full items-center justify-between rounded-xl px-4 py-3 text-sm font-medium text-[#0050cb] hover:bg-[#f0f3ff] transition-colors"
+                            >
+                                <span className="flex items-center gap-3">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="text-[#0050cb]">
+                                        <path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7-6.3-4.6-6.3 4.6 2.3-7-6-4.6h7.6z" />
+                                    </svg>
+                                    {billingSummary?.tier === "pro" ? "Pro Plan" : "Upgrade Pro"}
+                                </span>
+                                {billingSummary?.tier === "pro" && (
+                                    <span className="rounded-full bg-[#0050cb] px-2 py-0.5 text-[10px] font-bold text-white">
+                                        PRO
+                                    </span>
+                                )}
+                            </button>
+                            <button
                                 onClick={() => {
                                     setShowProfileSheet(false);
                                     handleLogout();
@@ -418,6 +490,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     </Link>
                 </nav>
             </div>
+
+            <UpgradeProModal
+                open={showUpgradeModal}
+                onClose={() => {
+                    setShowUpgradeModal(false);
+                    setUpgradeNotice(null);
+                }}
+                summary={billingSummary}
+                onUpgraded={handleUpgraded}
+                initialNotice={upgradeNotice}
+            />
         </div>
     );
 }

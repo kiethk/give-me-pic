@@ -15,6 +15,7 @@ import {
     getChatSessionMessages,
     getChatSessions,
     getSubjects,
+    QuotaExceededError,
     Subject,
     renameChatSession,
 } from "@/lib/api-client";
@@ -272,6 +273,23 @@ export default function ChatPage() {
                             : m
                     )
                 );
+            } else if (sendError instanceof QuotaExceededError) {
+                setMessages((current) =>
+                    current.filter(
+                        (m) =>
+                            m.messageId !== tempUserMessage.messageId &&
+                            m.messageId !== assistantId
+                    )
+                );
+                setQuestion(trimmed);
+                window.dispatchEvent(
+                    new CustomEvent("open-upgrade-modal", {
+                        detail: {
+                            message: sendError.message,
+                            quotaType: sendError.quotaType,
+                        },
+                    })
+                );
             } else {
                 const errorText = sendError instanceof Error ? sendError.message : "Could not send question.";
                 setMessages((current) =>
@@ -367,6 +385,18 @@ export default function ChatPage() {
                             ? { ...m, content: "(Generation stopped)" }
                             : m
                     )
+                );
+            } else if (retryError instanceof QuotaExceededError) {
+                setMessages((current) =>
+                    current.filter((m) => m.messageId !== assistantId)
+                );
+                window.dispatchEvent(
+                    new CustomEvent("open-upgrade-modal", {
+                        detail: {
+                            message: retryError.message,
+                            quotaType: retryError.quotaType,
+                        },
+                    })
                 );
             } else {
                 const errorText = retryError instanceof Error ? retryError.message : "Could not send question.";

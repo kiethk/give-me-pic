@@ -55,7 +55,17 @@ export default function UploadPage() {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const cameraInputRef = useRef<HTMLInputElement>(null);
 
-    const { queue, isOnline, rateLimitMessage, addToQueue, retryFailed, removeItem, clearFailed } = useUploadQueue();
+    const {
+        queue,
+        isOnline,
+        rateLimitMessage,
+        quotaExceededMessage,
+        clearQuotaError,
+        addToQueue,
+        retryFailed,
+        removeItem,
+        clearFailed,
+    } = useUploadQueue();
 
     useEffect(() => {
         getSubjects()
@@ -265,6 +275,46 @@ export default function UploadPage() {
                 <div className="mt-4 flex items-center gap-2.5 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-800">
                     <span>⏳</span>
                     <span>{rateLimitMessage}</span>
+                </div>
+            )}
+
+            {/* Quota exceeded banner */}
+            {quotaExceededMessage && (
+                <div className="mt-4 flex flex-col gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3.5 text-sm text-amber-950 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-start gap-2.5">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0 text-amber-600">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="12" y1="8" x2="12" y2="12" />
+                            <line x1="12" y1="16" x2="12.01" y2="16" />
+                        </svg>
+                        <div>
+                            <p className="font-semibold text-amber-950">Quota limit reached</p>
+                            <p className="mt-0.5 text-[13px] text-amber-900">{quotaExceededMessage}</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                        <button
+                            type="button"
+                            onClick={() =>
+                                window.dispatchEvent(
+                                    new CustomEvent("open-upgrade-modal", {
+                                        detail: { message: quotaExceededMessage },
+                                    })
+                                )
+                            }
+                            className="rounded-lg bg-[#0050cb] px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-[#0042a8]"
+                        >
+                            Upgrade Pro
+                        </button>
+                        <button
+                            type="button"
+                            onClick={clearQuotaError}
+                            aria-label="Dismiss quota alert"
+                            className="rounded-lg border border-amber-300 bg-white px-2.5 py-1.5 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-100"
+                        >
+                            Dismiss
+                        </button>
+                    </div>
                 </div>
             )}
 

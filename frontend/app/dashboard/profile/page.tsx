@@ -2,14 +2,63 @@
 
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
-import { getProfile, updateProfile, uploadAvatar, UserProfile } from "@/lib/api-client";
+import {
+    BillingSummary,
+    getBillingOrderStatus,
+    getBillingSummary,
+    getProfile,
+    updateProfile,
+    uploadAvatar,
+    UserProfile,
+} from "@/lib/api-client";
 import { useRouter } from "next/navigation";
+
+function formatPlanLabel(summary: BillingSummary): string {
+    if (summary.tier === "pro") {
+        if (summary.activePlan === "pro_yearly") return "Pro Yearly";
+        if (summary.activePlan === "pro_monthly") return "Pro Monthly";
+        return "Pro";
+    }
+    return "Free";
+}
+
+function formatExpiryDate(iso: string | null): string | null {
+    if (!iso) return null;
+    try {
+        const date = new Date(iso);
+        if (Number.isNaN(date.getTime())) return null;
+        return new Intl.DateTimeFormat("en-US", {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+        }).format(date);
+    } catch {
+        return null;
+    }
+}
+
+function formatStorage(bytes: number): string {
+    const gb = 1024 * 1024 * 1024;
+    const mb = 1024 * 1024;
+    if (bytes >= gb) {
+        const val = bytes / gb;
+        return `${Number.isInteger(val) ? val : val.toFixed(2)} GB`;
+    }
+    const val = bytes / mb;
+    return `${val >= 10 || val === 0 ? Math.round(val) : val.toFixed(1)} MB`;
+}
+
+function calcUsagePercent(used: number, limit: number): number {
+    if (limit <= 0) return 0;
+    return Math.min(100, Math.round((used / limit) * 100));
+}
 
 export default function ProfilePage() {
     const router = useRouter();
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const [profile, setProfile] = useState<UserProfile | null>(null);
+    const [billingSummary, setBillingSummary] = useState<BillingSummary | null>(null);
     const [displayName, setDisplayName] = useState("");
     const [avatarUrl, setAvatarUrl] = useState("");
     const [previewUrl, setPreviewUrl] = useState(""); // local blob preview
@@ -17,6 +66,7 @@ export default function ProfilePage() {
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState("");
     const [successMsg, setSuccessMsg] = useState("");
+    const [paymentNotice, setPaymentNotice] = useState("");
 
     useEffect(() => {
         getProfile()
@@ -27,6 +77,83 @@ export default function ProfilePage() {
                 setPreviewUrl(data.avatarUrl || "");
             })
             .catch(() => router.push("/"));
+
+        getBillingSummary()
+            .then(setBillingSummary)
+            .catch(() => {});
+
+        function handleBillingUpdated() {
+            getProfile().then(setProfile).catch(() => {});
+            getBillingSummary().then(setBillingSummary).catch(() => {});
+        }
+
+        window.addEventListener("billing-updated", handleBillingUpdated);
+        return () => window.removeEventListener("billing-updated", handleBillingUpdated);
+    }, [router]);
+
+    useEffect(() => {
+        let active = true;
+        const params = new URLSearchParams(window.location.search);
+        const payment = params.get("payment");
+        const orderCodeRaw = params.get("orderCode");
+        const trimmedOrderCode = orderCodeRaw?.trim() ?? "";
+        const parsedOrderCode = /^\d+$/.test(trimmedOrderCode) ? Number(trimmedOrderCode) : NaN;
+        const hasValidOrderCode = Number.isSafeInteger(parsedOrderCode) && parsedOrderCode > 0;
+
+        async function handlePayosReturn() {
+            if (hasValidOrderCode) {
+                try {
+                    const order = await getBillingOrderStatus(parsedOrderCode);
+                    if (!active) return;
+
+                    const [freshProfile, freshSummary] = await Promise.all([
+                        getProfile().catch(() => null),
+                        getBillingSummary().catch(() => null),
+                    ]);
+                    if (!active) return;
+
+                    if (freshProfile) setProfile(freshProfile);
+                    if (freshSummary) setBillingSummary(freshSummary);
+                    window.dispatchEvent(new Event("billing-updated"));
+
+                    if (order.status === "active") {
+                        setPaymentNotice("");
+                        setError("");
+                        setSuccessMsg("Pro subscription activated!");
+                    } else if (order.status === "cancelled" || payment === "cancelled") {
+                        setSuccessMsg("");
+                        setError("");
+                        setPaymentNotice("Payment was cancelled.");
+                    } else {
+                        setSuccessMsg("");
+                        setError("");
+                        setPaymentNotice("Payment is still pending verification.");
+                    }
+                } catch (err) {
+                    if (!active) return;
+                    setError(err instanceof Error ? err.message : "Could not verify payment status.");
+                } finally {
+                    if (active) {
+                        router.replace("/dashboard/profile");
+                    }
+                }
+            } else if (payment === "cancelled") {
+                await Promise.resolve();
+                if (!active) return;
+                setSuccessMsg("");
+                setError("");
+                setPaymentNotice("Payment was cancelled.");
+                router.replace("/dashboard/profile");
+            }
+        }
+
+        if (hasValidOrderCode || payment === "cancelled") {
+            void handlePayosReturn();
+        }
+
+        return () => {
+            active = false;
+        };
     }, [router]);
 
     async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -133,6 +260,14 @@ export default function ProfilePage() {
                     {successMsg}
                 </div>
             )}
+            {paymentNotice && (
+                <div className="mt-5 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0 text-amber-600">
+                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                    </svg>
+                    {paymentNotice}
+                </div>
+            )}
 
             <form onSubmit={handleSave} className="mt-6 space-y-5">
                 {/* ── Avatar section ── */}
@@ -182,7 +317,7 @@ export default function ProfilePage() {
                             <p className="truncate text-[15px] font-bold text-[#111c2d]">{profile.displayName}</p>
                             <p className="truncate text-[13px] text-[#727687]">{profile.email}</p>
                             <span className="mt-2 inline-flex items-center rounded-full bg-[#e7eeff] px-2.5 py-0.5 text-[11px] font-bold text-[#0050cb] uppercase tracking-wider">
-                                {profile.subscriptionTier}
+                                {billingSummary?.tier ?? profile.subscriptionTier}
                             </span>
                         </div>
                     </div>
@@ -256,6 +391,94 @@ export default function ProfilePage() {
                     )}
                 </button>
             </form>
+
+            {/* ── Billing & Usage section ── */}
+            <div className="mt-6 rounded-2xl border border-[#e2e8f0] bg-white p-5 md:p-6 shadow-sm space-y-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <h2 className="text-[15px] font-semibold text-[#111c2d]">Billing &amp; Usage</h2>
+                            {billingSummary && (
+                                <span
+                                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider ${
+                                        billingSummary.tier === "pro"
+                                            ? "bg-[#0050cb] text-white"
+                                            : "bg-[#e7eeff] text-[#0050cb]"
+                                    }`}
+                                >
+                                    {formatPlanLabel(billingSummary)}
+                                </span>
+                            )}
+                        </div>
+                        {billingSummary?.tier === "pro" && formatExpiryDate(billingSummary.expiresAt) ? (
+                            <p className="mt-1 text-[13px] text-[#727687]">
+                                Valid until {formatExpiryDate(billingSummary.expiresAt)}
+                            </p>
+                        ) : (
+                            <p className="mt-1 text-[13px] text-[#727687]">
+                                Monthly quotas reset on the 1st of each month.
+                            </p>
+                        )}
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={() => window.dispatchEvent(new CustomEvent("open-upgrade-modal"))}
+                        className="rounded-xl bg-[#0050cb] px-4 py-2 text-[13px] font-semibold text-white shadow-xs transition-colors hover:bg-[#0042a8]"
+                    >
+                        {billingSummary?.tier === "pro" ? "Renew / Extend Pro" : "Upgrade to Pro"}
+                    </button>
+                </div>
+
+                {billingSummary ? (
+                    <div className="space-y-4">
+                        {[
+                            {
+                                label: "Photos this month",
+                                valueLabel: `${billingSummary.photosUsed} / ${billingSummary.photosLimit}`,
+                                percent: calcUsagePercent(billingSummary.photosUsed, billingSummary.photosLimit),
+                            },
+                            {
+                                label: "AI questions this month",
+                                valueLabel: `${billingSummary.questionsUsed} / ${billingSummary.questionsLimit}`,
+                                percent: calcUsagePercent(billingSummary.questionsUsed, billingSummary.questionsLimit),
+                            },
+                            {
+                                label: "Storage",
+                                valueLabel: `${formatStorage(billingSummary.storageUsedBytes)} / ${formatStorage(billingSummary.storageQuotaBytes)}`,
+                                percent: calcUsagePercent(billingSummary.storageUsedBytes, billingSummary.storageQuotaBytes),
+                            },
+                        ].map((item) => {
+                            const barColor =
+                                item.percent >= 90
+                                    ? "bg-[#ba1a1a]"
+                                    : item.percent >= 75
+                                      ? "bg-amber-500"
+                                      : "bg-[#0050cb]";
+                            return (
+                                <div key={item.label} className="space-y-1.5">
+                                    <div className="flex items-center justify-between text-[13px]">
+                                        <span className="font-medium text-[#424656]">{item.label}</span>
+                                        <span className="font-semibold text-[#0f172a]">{item.valueLabel}</span>
+                                    </div>
+                                    <div className="h-2 w-full overflow-hidden rounded-full bg-[#f0f3ff]">
+                                        <div
+                                            className={`h-full rounded-full transition-all duration-300 ${barColor}`}
+                                            style={{ width: `${item.percent}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                ) : (
+                    <div className="space-y-3 animate-pulse">
+                        <div className="h-4 w-full rounded bg-[#f0f3ff]" />
+                        <div className="h-4 w-full rounded bg-[#f0f3ff]" />
+                        <div className="h-4 w-full rounded bg-[#f0f3ff]" />
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

@@ -24,6 +24,41 @@ export interface UserProfile {
     subscriptionTier: string;
 };
 
+export type BillingPlanCode = "pro_monthly" | "pro_yearly";
+export type QuotaType = "photos" | "questions" | "storage";
+
+export class QuotaExceededError extends Error {
+    readonly quotaType?: QuotaType;
+
+    constructor(message: string, quotaType?: QuotaType) {
+        super(message);
+        this.name = "QuotaExceededError";
+        this.quotaType = quotaType;
+    }
+}
+
+export interface BillingSummary {
+    tier: string;
+    activePlan: string | null;
+    expiresAt: string | null;
+    photosUsed: number;
+    photosLimit: number;
+    questionsUsed: number;
+    questionsLimit: number;
+    storageUsedBytes: number;
+    storageQuotaBytes: number;
+}
+
+export interface BillingOrder {
+    orderCode: number;
+    plan: BillingPlanCode;
+    amountVnd: number;
+    status: string;
+    qrCode: string;
+    checkoutUrl: string;
+    expiresAt: string | null;
+}
+
 export type Subject = {
     id: string;
     name: string;
@@ -126,6 +161,10 @@ export async function askChatStream(
 
     if (!response.ok) {
         const errorData = await response.json().catch(() => null);
+        const quotaErr = toQuotaExceededError(response.status, errorData);
+        if (quotaErr) {
+            throw quotaErr;
+        }
         const err = new Error(errorData?.message ?? `Server error (${response.status})`);
         callbacks.onError?.(err);
         throw err;
@@ -396,7 +435,8 @@ export async function uploadMedia(
     const presignedParams = new URLSearchParams({
         subjectId,
         fileName: file.name,
-        contentType: file.type || "application/octet-stream"
+        contentType: file.type || "application/octet-stream",
+        sizeBytes: file.size.toString(),
     });
     
     const presignedResponse = await request<{url: string, objectKey: string}>(`/api/media/presigned-url?${presignedParams.toString()}`, {
@@ -456,6 +496,41 @@ export async function logout() {
     });
 }
 
+export async function getBillingSummary(): Promise<BillingSummary> {
+    return request<BillingSummary>("/api/billing/summary", {
+        method: "GET",
+    });
+}
+
+export async function createBillingOrder(plan: BillingPlanCode): Promise<BillingOrder> {
+    return request<BillingOrder>("/api/billing/orders", {
+        method: "POST",
+        body: { plan },
+    });
+}
+
+export async function getBillingOrderStatus(orderCode: number): Promise<BillingOrder> {
+    return request<BillingOrder>(`/api/billing/orders/${orderCode}`, {
+        method: "GET",
+    });
+}
+
+interface ApiErrorPayload {
+    code?: string;
+    message?: string;
+    quotaType?: QuotaType;
+}
+
+function toQuotaExceededError(status: number, data: ApiErrorPayload | null): QuotaExceededError | null {
+    if (status === 402 || data?.code === "QUOTA_EXCEEDED") {
+        return new QuotaExceededError(
+            data?.message || "Quota limit reached. Upgrade to Pro to continue.",
+            data?.quotaType,
+        );
+    }
+    return null;
+}
+
 async function request<T>(
     path: string,
     options: {
@@ -474,6 +549,10 @@ async function request<T>(
     const data = await response.json().catch(() => null);
 
     if (!response.ok) {
+        const quotaErr = toQuotaExceededError(response.status, data);
+        if (quotaErr) {
+            throw quotaErr;
+        }
         if (response.status === 401) {
             throw new Error(data?.message || "Unauthorized: Session expired or invalid.");
         }
